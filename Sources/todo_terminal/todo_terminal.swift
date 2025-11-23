@@ -37,13 +37,15 @@ guard !args.isEmpty else {
     print("Usage:")
     print("  todo list")
     print("  todo [your todo without [] 🙂 ]")
+    print("  todo del [todo number]")
+    print("  todo update <todo number> <new todo>")
     exit(0)
 }
 
 // 3 loadTodos() ile todo listesini okuyoruz.
 var todos = loadTodos()
 
-// 4 Eger eger 0.arguman(cunku todos kaldirildi) list ise bu sefer todo listesi bos mu dolu mu kontrolu yapilir, bos ise ekrana mesaj verilir, dolu ise index numarasi ve kaydedilen todo ekrana yazilir.
+// 4 Eger eger 0.arguman(cunku todos kaldirildi) list ise bu sefer todo listesi bos mu dulu mu kontrolu yapilir, bos ise ekrana mesaj verilir, dolu ise index numarasi ve kaydedilen todo ekrana yazilir.
 if args[0] == "list" {
     if todos.isEmpty {
         print("No todos at all🎉")
@@ -58,6 +60,58 @@ if args[0] == "list" {
             print("\(pink)\(index + 1).\(reset) \(yellow)\(item)\(reset)")
         }
     }
+
+} else if args[0] == "del" {
+    // Todo silme işlemi
+    guard args.count > 1 else {
+        let red = "\u{001B}[31m"
+        let reset = "\u{001B}[0m"
+        print("\(red)Error:\(reset) Please provide a todo number to delete.")
+        print("Usage: todo del <number>")
+        exit(1)
+    }
+    
+    guard let index = Int(args[1]), index > 0, index <= todos.count else {
+        let red = "\u{001B}[31m"
+        let reset = "\u{001B}[0m"
+        print("\(red)Error:\(reset) Invalid todo number. Please use a number between 1 and \(todos.count).")
+        exit(1)
+    }
+    
+    let deletedTodo = todos.remove(at: index - 1) // index 1-based, array 0-based
+    saveTodos(todos)
+    
+    let red = "\u{001B}[31m"
+    let reset = "\u{001B}[0m"
+    print("\(red)✗ Deleted:\(reset) \(deletedTodo)")
+
+} else if args[0] == "update" {
+    // Todo güncelleme işlemi
+    guard args.count > 2 else {
+        let red = "\u{001B}[31m"
+        let reset = "\u{001B}[0m"
+        print("\(red)Error:\(reset) Please provide a todo number and new text.")
+        print("Usage: todo update <number> <new text>")
+        exit(1)
+    }
+    
+    guard let index = Int(args[1]), index > 0, index <= todos.count else {
+        let red = "\u{001B}[31m"
+        let reset = "\u{001B}[0m"
+        print("\(red)Error:\(reset) Invalid todo number. Please use a number between 1 and \(todos.count).")
+        exit(1)
+    }
+    
+    let oldTodo = todos[index - 1] // index 1-based, array 0-based
+    let newText = Array(args.dropFirst(2)).joined(separator: " ") // İlk 2 argümanı atla (update ve numara)
+    todos[index - 1] = newText
+    saveTodos(todos)
+    
+    let blue = "\u{001B}[34m"
+    let reset = "\u{001B}[0m"
+    print("\(blue)↻ Updated:\(reset)")
+    print("  Old: \(oldTodo)")
+    print("  New: \(newText)")
 
 } else {
     // 5 eger list degil ise args icindeki string degerleri " " ile birlestirilir ve bir string olarak text icinde tutulur.
