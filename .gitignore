@@ -1,5 +1,9 @@
 .DS_Store
-/.build
+/target/
+/dist/
+/assets/terminal-todos-icon.json
+**/__pycache__/
+**/.build/
 /Packages
 xcuserdata/
 DerivedData/
