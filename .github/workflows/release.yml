@@ -27,7 +27,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       MACOSX_DEPLOYMENT_TARGET: "11.0"
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+      # Ubuntu 22.04's musl-gcc wrapper breaks Rust's static PIE startup (rust-lang/rust#95926).
+      # cc links against Rust's self-contained musl CRT/libc without that wrapper.
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: cc
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +55,14 @@ jobs:
         run: |
           cargo build --release --locked --target ${{ matrix.target }}
           node scripts/package_binary.mjs ${{ matrix.target }}
+      - name: Verify Linux binary has no dynamic interpreter
+        if: runner.os == 'Linux'
+        run: |
+          readelf -l target/${{ matrix.target }}/release/todo > "$RUNNER_TEMP/program-headers"
+          if grep -q INTERP "$RUNNER_TEMP/program-headers"; then
+            echo "Expected a self-contained static musl binary"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
