@@ -15,6 +15,14 @@ brew tap TemelGunaydin/tap
 brew install todo
 ```
 
+## Pi
+
+```bash
+pi install git:github.com/TemelGunaydin/terminal-todos
+```
+
+Use `/todo` or **Ctrl+Alt+T**. First use asks to install a verified binary (macOS/Linux, arm64/x64); `q` returns to Pi. No Rust needed.
+
 ## Usage
 
 Open the dashboard:

@@ -1,6 +1,7 @@
 .DS_Store
 /target/
 /dist/
+/node_modules/
 /assets/terminal-todos-icon.json
 **/__pycache__/
 **/.build/

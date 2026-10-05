@@ -21,7 +21,7 @@ BINARY = Path(sys.argv[1] if len(sys.argv) > 1 else "target/debug/todo").resolve
 
 
 class Session:
-    def __init__(self, env, args=(), columns=120, rows=32):
+    def __init__(self, env, args=(), columns=120, rows=32, command=None, cwd=None):
         self.master, self.slave = pty.openpty()
         self.original = termios.tcgetattr(self.slave)
         fcntl.ioctl(self.slave, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0))
@@ -30,8 +30,8 @@ class Session:
         self.decoder = codecs.getincrementaldecoder("utf-8")("replace")
         self.raw = b""
         self.process = subprocess.Popen(
-            [str(BINARY), *args], stdin=self.slave, stdout=self.slave,
-            stderr=self.slave, env=env, start_new_session=True,
+            [*(command or [str(BINARY)]), *args], stdin=self.slave, stdout=self.slave,
+            stderr=self.slave, env=env, cwd=cwd, start_new_session=True,
         )
 
     @property
