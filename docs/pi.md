@@ -22,7 +22,7 @@ the native dashboard runs. Print/RPC/JSON modes and busy agents cannot launch it
 - macOS arm64/x64 builds target macOS 11+. Linux arm64/x64 builds use static musl.
   Other platforms are rejected without installing anything.
 
-## Project attribution and data compatibility (v1.4.0, unreleased)
+## Project attribution and data compatibility (v1.4.0)
 
 `runDashboard` already passes `ctx.cwd` as the native process's working directory.
 Rust captures the Git top-level folder name, falling back to the current folder
@@ -39,9 +39,9 @@ Schema-2 files are rejected by v1.3.0 and older without overwriting them. Upgrad
 all Pi/CLI readers before sharing migrated data; preserve the current schema-2
 file before restoring a backup because the backup excludes post-upgrade changes.
 
-v1.4.0 is prepared locally, not published. Released v1.2.0/v1.3.0 artifacts must
-remain immutable. The next approved release must include matching native assets;
-Homebrew needs its separately approved source archive/tap update for schema 2.
+v1.4.0 has matching native release assets and a separate Homebrew source archive.
+The Homebrew formula/tap is updated independently to support schema 2. The older
+v1.2.0/v1.3.0 tags, assets and checksums remain immutable.
 
 ## Verification
 
@@ -73,8 +73,8 @@ pi -e .
 PR and manual runs produce artifacts only. An explicitly pushed matching
 `v<version>` tag creates a new release with four executables and their checksums.
 It refuses mismatched tags and existing releases; it does not replace assets.
-Only push a release tag after release approval. The existing `v1.2.0` source
-archive, checksum and Homebrew formula remain untouched.
+Only push a release tag after release approval. Previous releases remain untouched;
+a new Homebrew version gets a separately uploaded source archive/checksum and tap update.
 
 Local native packaging (no publish):
 

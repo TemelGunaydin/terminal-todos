@@ -1,9 +1,9 @@
 class Todo < Formula
   desc "Keyboard-first terminal todo dashboard written in Rust"
   homepage "https://github.com/TemelGunaydin/terminal-todos"
-  url "https://github.com/TemelGunaydin/terminal-todos/releases/download/v1.2.0/terminal-todos-1.2.0.tar.gz"
-  version "1.2.0"
-  sha256 "3f9db352961b6481123fa00598fbf49ccfb2ecf85ba7ba562c3a89099e762c3f"
+  url "https://github.com/TemelGunaydin/terminal-todos/releases/download/v1.4.0/terminal-todos-1.4.0.tar.gz"
+  version "1.4.0"
+  sha256 "79eee958c97d7a6a8d327d5696f3af01b67e7b966a6ee378ee63914becde3b36"
   license "MIT"
 
   depends_on "rust" => :build
@@ -18,11 +18,16 @@ class Todo < Formula
       original = "[\"Legacy task\"]\n"
       legacy.write original
 
-      assert_match "todo 1.2.0", shell_output("#{bin}/todo --version")
+      assert_match "todo 1.4.0", shell_output("#{bin}/todo --version")
       assert_match "dashboard", shell_output("#{bin}/todo --help")
       assert_match "[ ] #1 Legacy task", shell_output("#{bin}/todo list --all")
       system bin/"todo", "add", "Homebrew task"
       assert_match "[ ] #2 Homebrew task", shell_output("#{bin}/todo list")
+      data = testpath/"data/terminal-todos/todos.json"
+      saved = JSON.parse(data.read)
+      assert_equal 2, saved.fetch("version")
+      assert_nil saved.fetch("tasks").first["project"]
+      assert_equal testpath.basename.to_s, saved.fetch("tasks")[1].fetch("project")
       system bin/"todo", "done", "2"
       assert_match "[x] #2 Homebrew task", shell_output("#{bin}/todo list --done")
       system bin/"todo", "update", "2", "Updated task"
@@ -34,7 +39,6 @@ class Todo < Formula
       assert_equal original, legacy.read
       assert_match "was not found", shell_output("#{bin}/todo done 99 2>&1", 1)
 
-      data = testpath/"data/terminal-todos/todos.json"
       data.write "broken json"
       assert_match "Invalid task data", shell_output("#{bin}/todo add New 2>&1", 1)
       assert_equal "broken json", data.read

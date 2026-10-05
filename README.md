@@ -19,7 +19,7 @@ Open the dashboard without leaving [Pi](https://pi.dev/). Supports macOS 11+ and
 Run this in your **terminal**, not as a Pi slash command:
 
 ```bash
-pi install git:github.com/TemelGunaydin/terminal-todos@v1.3.0
+pi install git:github.com/TemelGunaydin/terminal-todos@v1.4.0
 ```
 
 This installs the extension for your user. Add `--local` to install it only for the current project; project extensions require Pi's project-trust approval.
@@ -136,7 +136,7 @@ Colors are automatic. Use `todo --color never`, `todo --color always list`, or s
 
 ## Project labels — v1.4.0
 
-The screenshot above shows four projects in one shared dashboard. v1.4.0 is being prepared for release; the currently published v1.3.0 package and Homebrew formula do not include project labels yet.
+The screenshot above shows four projects in one shared dashboard. **Available in v1.4.0** for both Pi and the standalone app. Upgrade both if they share your task file.
 
 New tasks remember the **Git repository's root folder name**, even when added from a subdirectory. Outside Git, the current folder name is used. Pi passes its working directory to Todo, so `/todo` captures that project too. Only the name is stored, not an absolute path.
 
@@ -161,12 +161,12 @@ Your tasks stay on your device. The Pi launcher does not send task contents to t
 
 ## Manage the Pi package
 
-Check installed packages with `pi list`. The command above pins **v1.3.0**: `pi update --extensions` will not move a pinned tag to a newer release. To upgrade later, run `pi install` with the new published tag, then `/reload` in Pi.
+Check installed packages with `pi list`. The command above pins **v1.4.0**: `pi update --extensions` will not move a pinned tag to a newer release. If you installed v1.3.0 or an older tag, run the installation command above to upgrade, then `/reload` in Pi. Use the new published tag for future upgrades too.
 
 To remove the extension:
 
 ```bash
-pi remove git:github.com/TemelGunaydin/terminal-todos@v1.3.0
+pi remove git:github.com/TemelGunaydin/terminal-todos@v1.4.0
 ```
 
 Then `/reload` or restart Pi. Add `--local` if you installed it for the project. Removing the extension does not delete your tasks.
@@ -182,4 +182,4 @@ Then `/reload` or restart Pi. Add `--local` if you installed it for the project.
 - **Old app cannot read tasks after a v1.4.0 upgrade:** use v1.4.0+ for both Pi and the standalone CLI. Do not delete the task file to make an older app work.
 - **Migration backup differs from current data:** keep the existing backup, move it aside, then retry. Neither file is overwritten while the conflict exists.
 
-[Release binaries](https://github.com/TemelGunaydin/terminal-todos/releases/tag/v1.3.0) · [Development and release notes](docs/pi.md)
+[Release binaries](https://github.com/TemelGunaydin/terminal-todos/releases/tag/v1.4.0) · [Development and release notes](docs/pi.md)
