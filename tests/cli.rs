@@ -14,7 +14,11 @@ impl Sandbox {
         }
     }
     fn run(&self, args: &[&str]) -> Output {
+        self.run_from(&std::env::current_dir().unwrap(), args)
+    }
+    fn run_from(&self, cwd: &std::path::Path, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_todo"))
+            .current_dir(cwd)
             .args(args)
             .env("HOME", self.home.path())
             .env("XDG_DATA_HOME", self.home.path().join("data"))
@@ -137,6 +141,99 @@ fn explicit_color_is_supported_without_changing_plain_default() {
     sandbox.ok(&["add", "Task"]);
     assert!(sandbox.ok(&["--color", "always", "list"]).contains("\x1b["));
     assert!(!sandbox.ok(&["list", "--color", "never"]).contains("\x1b["));
+}
+
+#[test]
+fn project_origin_is_saved_once_and_shown_in_plain_and_colored_output() {
+    let sandbox = Sandbox::new();
+    let alpha = sandbox.home.path().join("Alpha project 🦀");
+    let beta = sandbox.home.path().join("Beta");
+    fs::create_dir(&alpha).unwrap();
+    fs::create_dir(&beta).unwrap();
+    assert!(
+        sandbox
+            .run_from(&alpha, &["add", "Alpha task"])
+            .status
+            .success()
+    );
+    assert!(
+        sandbox
+            .run_from(&beta, &["add", "Beta task"])
+            .status
+            .success()
+    );
+    assert!(
+        sandbox
+            .run_from(&beta, &["update", "1", "Edited from Beta"])
+            .status
+            .success()
+    );
+    assert!(sandbox.run_from(&beta, &["done", "1"]).status.success());
+    assert!(sandbox.run_from(&alpha, &["undo", "1"]).status.success());
+    let data: serde_json::Value =
+        serde_json::from_slice(&fs::read(sandbox.file()).unwrap()).unwrap();
+    assert_eq!(data["version"], 2);
+    assert_eq!(data["tasks"][0]["project"], "Alpha project 🦀");
+    assert_eq!(data["tasks"][1]["project"], "Beta");
+    let plain = sandbox.ok(&["list", "--all"]);
+    assert!(plain.contains("[Alpha project 🦀]") && plain.contains("[Beta]"));
+    assert!(!plain.contains('\u{1b}'));
+    let (r, g, b) = terminal_todos::project::rgb("Alpha project 🦀");
+    let colored = sandbox.ok(&["--color", "always", "list"]);
+    assert!(colored.contains(&format!("\u{1b}[1;38;2;{r};{g};{b}m[Alpha project 🦀]")));
+}
+
+#[test]
+fn nested_repository_add_uses_the_root_name() {
+    let sandbox = Sandbox::new();
+    let root = sandbox.home.path().join("SampleRepo");
+    fs::create_dir_all(root.join("src/nested")).unwrap();
+    assert!(
+        Command::new("git")
+            .args(["init", "-q"])
+            .arg(&root)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        sandbox
+            .run_from(&root.join("src/nested"), &["add", "Nested note"])
+            .status
+            .success()
+    );
+    let data: serde_json::Value =
+        serde_json::from_slice(&fs::read(sandbox.file()).unwrap()).unwrap();
+    assert_eq!(data["tasks"][0]["project"], "SampleRepo");
+    assert!(sandbox.ok(&["list"]).contains("[SampleRepo]"));
+}
+
+#[test]
+fn existing_v1_tasks_are_not_backfilled_and_migration_is_backed_up() {
+    let sandbox = Sandbox::new();
+    fs::create_dir_all(sandbox.file().parent().unwrap()).unwrap();
+    let original = "{\"version\":1,\"next_id\":2,\"tasks\":[{\"id\":1,\"title\":\"Existing note\",\"completed\":true,\"created_at\":123}]}\n";
+    fs::write(sandbox.file(), original).unwrap();
+    assert!(sandbox.ok(&["list", "--all"]).contains("Existing note"));
+    assert_eq!(fs::read_to_string(sandbox.file()).unwrap(), original);
+    let project = sandbox.home.path().join("NewProject");
+    fs::create_dir(&project).unwrap();
+    assert!(
+        sandbox
+            .run_from(&project, &["add", "New note"])
+            .status
+            .success()
+    );
+    let data: serde_json::Value =
+        serde_json::from_slice(&fs::read(sandbox.file()).unwrap()).unwrap();
+    assert_eq!(data["tasks"][0]["project"], serde_json::Value::Null);
+    assert_eq!(data["tasks"][0]["created_at"], 123);
+    assert_eq!(data["tasks"][0]["completed"], true);
+    assert_eq!(data["tasks"][1]["project"], "NewProject");
+    assert_eq!(
+        fs::read_to_string(sandbox.file().with_file_name("todos.v1.backup.json")).unwrap(),
+        original
+    );
 }
 
 #[test]

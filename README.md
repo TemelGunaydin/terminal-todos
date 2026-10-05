@@ -6,7 +6,9 @@
 
 <p align="center">A simple, keyboard-first todo app for your terminal. Built with Rust.</p>
 
-![Terminal Todos dashboard with sample tasks](assets/dashboard.png)
+![Terminal Todos dashboard showing colored project labels across four sample projects](assets/dashboard.png)
+
+**New in v1.4.0: keep the project with the note.** Todo automatically remembers where each task was created and displays a consistent, colored project badge. Switch projects without losing the context of your notes—inside Pi or from the CLI.
 
 ## Use inside Pi
 
@@ -132,6 +134,20 @@ Task numbers are **stable IDs**, not positions in the current list. `edit` is an
 
 Colors are automatic. Use `todo --color never`, `todo --color always list`, or set `NO_COLOR` to disable automatic colors.
 
+## Project labels — v1.4.0
+
+The screenshot above shows four projects in one shared dashboard. v1.4.0 is being prepared for release; the currently published v1.3.0 package and Homebrew formula do not include project labels yet.
+
+New tasks remember the **Git repository's root folder name**, even when added from a subdirectory. Outside Git, the current folder name is used. Pi passes its working directory to Todo, so `/todo` captures that project too. Only the name is stored, not an absolute path.
+
+The dashboard shows colored project badges in the list and details, with the active project visible in the header and add dialog. Each name gets a consistent color. CLI output includes the same label; monochrome output keeps the text:
+
+```text
+[ ] #12 Polish the dashboard [terminal-todos]
+```
+
+Editing or completing a task from another project preserves its original label. Existing Rust and imported Swift tasks remain unassigned; all projects still share one task file.
+
 ## Data and privacy
 
 Your tasks stay on your device. The Pi launcher does not send task contents to the model; its first installation downloads the executable, not your tasks.
@@ -140,6 +156,8 @@ Your tasks stay on your device. The Pi launcher does not send task contents to t
 - With an **absolute** `XDG_DATA_HOME`: `$XDG_DATA_HOME/terminal-todos/todos.json`.
 - Existing `~/.swift_todos.json` tasks are imported once when Rust data does not exist. The original Swift file is left unchanged; the old Swift app is **not** live-synchronized with Rust.
 - Pi's executable cache is separate: `~/.pi/agent/tools/terminal-todos/<version>/<target>/`. A custom `PI_CODING_AGENT_DIR` moves that cache, not the task file.
+
+**v1.4.0 compatibility:** existing version-1 Rust files can be read without changing them. The first successful mutation upgrades to version 2 and saves an exact `todos.v1.backup.json` beside `todos.json`. Old tasks keep their IDs, titles, status, and timestamps. Todo v1.3.0 and older reject version-2 data rather than overwrite it: use v1.4.0+ for every Pi/CLI instance sharing that file. If rolling back, keep both the current file and backup; the backup is a pre-upgrade snapshot and does not include later changes.
 
 ## Manage the Pi package
 
@@ -161,5 +179,7 @@ Then `/reload` or restart Pi. Add `--local` if you installed it for the project.
 - **Dashboard requires an interactive terminal:** use a real terminal, or `todo list` for piped output. Resize if the dashboard asks for more space.
 - **Download fails:** check your connection and retry `/todo`. If a release asset is not yet available, wait for its publication; there is no automatic Rust/Cargo fallback.
 - **Cached install fails validation:** remove only the executable-cache directory named in the error and retry `/todo`. Do not remove the task-data directory.
+- **Old app cannot read tasks after a v1.4.0 upgrade:** use v1.4.0+ for both Pi and the standalone CLI. Do not delete the task file to make an older app work.
+- **Migration backup differs from current data:** keep the existing backup, move it aside, then retry. Neither file is overwritten while the conflict exists.
 
 [Release binaries](https://github.com/TemelGunaydin/terminal-todos/releases/tag/v1.3.0) · [Development and release notes](docs/pi.md)

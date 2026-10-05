@@ -36,6 +36,11 @@ FORMULA = '''class Todo < Formula
       assert_match "[ ] #1 Legacy task", shell_output("#{bin}/todo list --all")
       system bin/"todo", "add", "Homebrew task"
       assert_match "[ ] #2 Homebrew task", shell_output("#{bin}/todo list")
+      data = testpath/"data/terminal-todos/todos.json"
+      saved = JSON.parse(data.read)
+      assert_equal 2, saved.fetch("version")
+      assert_nil saved.fetch("tasks").first["project"]
+      assert_equal testpath.basename.to_s, saved.fetch("tasks")[1].fetch("project")
       system bin/"todo", "done", "2"
       assert_match "[x] #2 Homebrew task", shell_output("#{bin}/todo list --done")
       system bin/"todo", "update", "2", "Updated task"
@@ -47,7 +52,6 @@ FORMULA = '''class Todo < Formula
       assert_equal original, legacy.read
       assert_match "was not found", shell_output("#{bin}/todo done 99 2>&1", 1)
 
-      data = testpath/"data/terminal-todos/todos.json"
       data.write "broken json"
       assert_match "Invalid task data", shell_output("#{bin}/todo add New 2>&1", 1)
       assert_equal "broken json", data.read
@@ -70,6 +74,7 @@ def package():
     # Explicit inclusion avoids packaging .git, .pi, build output or user data.
     paths = [ROOT / name for name in [
         "Cargo.toml", "Cargo.lock", "README.md", "assets/terminal-todos-icon.png",
+        "assets/dashboard.png", "docs/pi.md",
         "scripts/install.sh", "scripts/test_tui.py", "scripts/package_homebrew.py",
         "scripts/test_homebrew.rb", "homebrew/README.md", "legacy/swift/README.md",
         "legacy/swift/Package.swift",

@@ -100,7 +100,11 @@ def run_case(root, mode="ok", tui_mode="fullscreen"):
                "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-context-files",
                "--no-themes", "--no-approve", "--tui-mode", tui_mode, "--model", "pi-todo-test/unused",
                "-e", str(ROOT), "-e", str(ready)]
-    session = PiSession(env, command=command, cwd=root)
+    workspace = root / f"{root.name} Project"
+    nested = workspace / "src"
+    nested.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(workspace)], env=env, check=True, capture_output=True)
+    session = PiSession(env, command=command, cwd=nested)
     try:
         session.wait(lambda text: "PI-TODO-READY" in text, timeout=15)
     except BaseException:
@@ -169,6 +173,8 @@ def suite():
                 back_to_pi(session)
                 tasks = json.loads(data.read_text())["tasks"]
                 assert [task["title"] for task in tasks] == ["Shared CLI task", "Added inside Pi"]
+                assert tasks[1]["project"] == f"{tui_mode} Project", "Pi must pass its workspace cwd into Todo"
+                assert tasks[0]["project"] != tasks[1]["project"], "An existing task must keep its original project"
                 cli = subprocess.run([str(BINARY), "list"], env=env, check=True, capture_output=True, text=True)
                 assert "Added inside Pi" in cli.stdout
                 # Keep unsent editor text through shortcut -> Todo -> Pi.
@@ -196,7 +202,7 @@ def suite():
                 session.finish()
             finally:
                 session.close()
-            print(f"PASS: {tui_mode}: approval/decline, verified install, shared CLI data, shortcut/draft, cached offline launch, Ctrl+C/SIGINT/SIGTERM, child failure, terminal restoration")
+            print(f"PASS: {tui_mode}: approval/decline, verified install, Pi workspace/project capture, shared CLI data, shortcut/draft, cached offline launch, Ctrl+C/SIGINT/SIGTERM, child failure, terminal restoration")
 
         for mode, expected in [("hold", "installation cancelled"), ("checksum", "SHA-256 mismatch"), ("missing", "not published")]:
             root = base / mode

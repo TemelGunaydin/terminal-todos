@@ -1,5 +1,5 @@
 use super::{Action, App, draw};
-use crate::{model::safe, store::Store};
+use crate::{model::safe, project, store::Store};
 use anyhow::{Context, Result, bail};
 use crossterm::{
     event::{self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyModifiers},
@@ -37,6 +37,7 @@ pub fn run(store: Store, color: bool) -> Result<i32> {
         );
     }
     let db = store.load()?;
+    let project = project::current();
     let interrupted = Arc::new(AtomicUsize::new(0));
     // Install restoration before initialization, including partial failures.
     let mut guard = TerminalGuard { signals: vec![] };
@@ -49,7 +50,7 @@ pub fn run(store: Store, color: bool) -> Result<i32> {
     }
     let mut terminal = ratatui::try_init().context("Could not open the terminal dashboard")?;
     execute!(io::stdout(), EnableBracketedPaste)?;
-    let mut app = App::new(db, color);
+    let mut app = App::new(db, color, project);
     let mut refresh_at = Instant::now() + Duration::from_secs(1);
     let mut age_at = Instant::now() + Duration::from_secs(60);
     let mut dirty = true;
@@ -123,7 +124,10 @@ pub fn run(store: Store, color: bool) -> Result<i32> {
 fn apply(action: Action, store: &Store, app: &mut App) {
     let added = matches!(action, Action::Add(_));
     let (result, verb) = match action {
-        Action::Add(text) => (store.transact(|db| db.add(&text)), "Added"),
+        Action::Add(text) => (
+            store.transact(|db| db.add_for_project(&text, app.project.as_deref())),
+            "Added",
+        ),
         Action::Edit(id, text) => (store.transact(|db| db.update(id, &text)), "Updated"),
         Action::Toggle(id) => (store.transact(|db| db.toggle(id)), "Status changed"),
         Action::Delete(id) => (store.transact(|db| db.delete(id)), "Deleted"),

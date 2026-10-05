@@ -66,6 +66,7 @@ pub struct App {
     pub message: String,
     pub error: bool,
     pub color: bool,
+    pub project: Option<String>,
     pub page_size: usize,
     pub detail_scroll: u16,
     pub detail_max: u16,
@@ -73,7 +74,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(db: Database, color: bool) -> Self {
+    pub fn new(db: Database, color: bool, project: Option<String>) -> Self {
         let mut app = Self {
             db,
             list: ListState::default(),
@@ -84,6 +85,7 @@ impl App {
             message: "Ready · changes save automatically".into(),
             error: false,
             color,
+            project,
             page_size: 1,
             detail_scroll: 0,
             detail_max: 0,
@@ -371,7 +373,7 @@ mod tests {
         db.add("First task")?;
         db.add("Türkçe görev")?;
         db.add("Last task")?;
-        Ok(App::new(db, true))
+        Ok(App::new(db, true, None))
     }
 
     #[test]
@@ -426,7 +428,7 @@ mod tests {
 
     #[test]
     fn delete_requires_confirmation_and_empty_navigation_is_safe() {
-        let mut app = App::new(Database::default(), false);
+        let mut app = App::new(Database::default(), false, None);
         for code in [
             KeyCode::Down,
             KeyCode::End,

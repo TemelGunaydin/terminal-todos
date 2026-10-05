@@ -1,5 +1,6 @@
 use crate::{
     model::{Task, safe},
+    project,
     store::Store,
 };
 use anyhow::Result;
@@ -45,7 +46,7 @@ impl Cli {
 pub enum Command {
     /// Open the interactive dashboard (also the default).
     Tui,
-    /// Add a task. Quotes are optional for multi-word text.
+    /// Add a task tagged with the current project. Quotes are optional for multi-word text.
     Add {
         #[arg(required = true, num_args = 1..)]
         text: Vec<String>,
@@ -99,7 +100,9 @@ pub fn run(command: &Command, store: &Store, color: bool) -> Result<()> {
             }
         }
         Command::Add { text } => {
-            let (_, task) = store.transact(|db| db.add(&text.join(" ")))?;
+            let project = project::current();
+            let (_, task) =
+                store.transact(|db| db.add_for_project(&text.join(" "), project.as_deref()))?;
             success("Added", &task, color);
         }
         Command::Update { id, text } => {
@@ -133,23 +136,48 @@ fn print_task(task: &Task, color: bool) {
             "38;2;167;139;250"
         };
         println!(
-            "\x1b[{shade}m{marker} #{}\x1b[0m {}",
+            "\x1b[{shade}m{marker} #{}\x1b[0m {}{}",
             task.id,
-            safe(&task.title)
+            safe(&task.title),
+            project_suffix(task, color)
         );
     } else {
-        println!("{marker} #{} {}", task.id, safe(&task.title));
+        println!(
+            "{marker} #{} {}{}",
+            task.id,
+            safe(&task.title),
+            project_suffix(task, color)
+        );
     }
 }
 
 fn success(action: &str, task: &Task, color: bool) {
     if color {
         println!(
-            "\x1b[38;2;167;139;250m{action}\x1b[0m #{}: {}",
+            "\x1b[38;2;167;139;250m{action}\x1b[0m #{}: {}{}",
             task.id,
-            safe(&task.title)
+            safe(&task.title),
+            project_suffix(task, color)
         );
     } else {
-        println!("{action} #{}: {}", task.id, safe(&task.title));
+        println!(
+            "{action} #{}: {}{}",
+            task.id,
+            safe(&task.title),
+            project_suffix(task, color)
+        );
+    }
+}
+
+fn project_suffix(task: &Task, color: bool) -> String {
+    let Some(name) = &task.project else {
+        return String::new();
+    };
+    let label = format!("[{}]", safe(name));
+    if color {
+        let (r, g, b) = project::rgb(name);
+        format!(" \x1b[1;38;2;{r};{g};{b}m{label}\x1b[0m")
+    } else {
+        format!(" {label}")
     }
 }

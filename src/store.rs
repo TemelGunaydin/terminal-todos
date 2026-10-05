@@ -1,4 +1,4 @@
-use crate::model::{Database, Task, now};
+use crate::model::{DATA_VERSION, Database, Task, now};
 use anyhow::{Context, Result};
 use std::{
     fs::{self, File, OpenOptions},
@@ -54,8 +54,13 @@ impl Store {
     ) -> Result<(Database, T)> {
         let _lock = self.lock()?;
         let mut db = self.load_locked()?;
+        let old_version = db.version;
         let result = change(&mut db)?;
+        db.version = DATA_VERSION;
         db.validate()?;
+        if old_version == 1 {
+            self.backup_v1()?;
+        }
         self.save_locked(&db)?;
         Ok((db, result))
     }
@@ -129,12 +134,39 @@ impl Store {
                 title,
                 completed: false,
                 created_at: imported_at,
+                project: None,
             });
         }
         db.validate()?;
         self.save_locked(&db)?;
         // The Swift file remains byte-for-byte intact for rollback.
         Ok(db)
+    }
+
+    fn backup_v1(&self) -> Result<()> {
+        let backup = self.file.with_extension("v1.backup.json");
+        let bytes = fs::read(&self.file).context("Could not read version 1 data for backup")?;
+        match fs::symlink_metadata(&backup) {
+            Ok(metadata) => {
+                if !metadata.is_file() || metadata.is_symlink() || fs::read(&backup)? != bytes {
+                    anyhow::bail!(
+                        "Existing migration backup {} differs from current data. Keep it and move it aside before retrying. The task file was not changed.",
+                        backup.display()
+                    );
+                }
+                return Ok(());
+            }
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
+            Err(error) => return Err(error).context("Could not inspect migration backup"),
+        }
+        let parent = self.file.parent().context("Data file has no parent")?;
+        let mut temp = tempfile::NamedTempFile::new_in(parent)?;
+        temp.write_all(&bytes)?;
+        temp.as_file().sync_all()?;
+        temp.persist_noclobber(&backup).with_context(|| {
+            format!("Could not preserve version 1 data at {}", backup.display())
+        })?;
+        Ok(())
     }
 
     fn save_locked(&self, db: &Database) -> Result<()> {
@@ -228,6 +260,70 @@ mod tests {
         assert_eq!(db.tasks.len(), 12);
         assert_eq!(db.next_id, 13);
         assert!(db.tasks.iter().find(|task| task.id == 1).unwrap().completed);
+        Ok(())
+    }
+
+    #[test]
+    fn reading_v1_is_nondestructive_and_first_write_keeps_an_exact_backup() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let file = dir.path().join("todos.json");
+        let original = "{\"version\":1,\"next_id\":2,\"tasks\":[{\"id\":1,\"title\":\"Old task\",\"completed\":true,\"created_at\":123}]}\n";
+        fs::write(&file, original)?;
+        let store = Store::new(file.clone(), None);
+        assert_eq!(store.load()?.tasks[0].project, None);
+        assert_eq!(fs::read_to_string(&file)?, original);
+        let backup = dir.path().join("todos.v1.backup.json");
+        assert!(!backup.exists());
+        assert!(store.transact(|db| db.add("  ")).is_err());
+        assert!(!backup.exists());
+        store.transact(|db| db.add_for_project("New task", Some("Bookfun")))?;
+        assert_eq!(fs::read_to_string(&backup)?, original);
+        let db = store.load()?;
+        assert_eq!(db.version, DATA_VERSION);
+        assert_eq!(db.tasks[0].id, 1);
+        assert_eq!(db.tasks[0].created_at, 123);
+        assert!(db.tasks[0].completed);
+        assert_eq!(db.tasks[0].project, None);
+        assert_eq!(db.tasks[1].project.as_deref(), Some("Bookfun"));
+        store.transact(|db| db.update(1, "Edited"))?;
+        assert_eq!(fs::read_to_string(&backup)?, original);
+        Ok(())
+    }
+
+    #[test]
+    fn a_conflicting_backup_never_overwrites_either_file() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let file = dir.path().join("todos.json");
+        let original = "{\"version\":1,\"next_id\":1,\"tasks\":[]}";
+        fs::write(&file, original)?;
+        let backup = dir.path().join("todos.v1.backup.json");
+        fs::write(&backup, "earlier snapshot")?;
+        let store = Store::new(file.clone(), None);
+        assert!(store.transact(|db| db.add("New task")).is_err());
+        assert_eq!(fs::read_to_string(&file)?, original);
+        assert_eq!(fs::read_to_string(&backup)?, "earlier snapshot");
+        fs::write(&backup, original)?;
+        store.transact(|db| db.add("Retry"))?;
+        assert_eq!(store.load()?.version, DATA_VERSION);
+        assert_eq!(fs::read_to_string(&backup)?, original);
+        Ok(())
+    }
+
+    #[test]
+    fn custom_data_filenames_have_independent_backups() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        for filename in ["first.json", "second.json", "todos.v1.backup.json"] {
+            let file = dir.path().join(filename);
+            let original = "{\"version\":1,\"next_id\":1,\"tasks\":[]}";
+            fs::write(&file, original)?;
+            let store = Store::new(file.clone(), None);
+            store.transact(|db| db.add_for_project("New task", Some("Bookfun")))?;
+            assert_eq!(
+                fs::read_to_string(file.with_extension("v1.backup.json"))?,
+                original
+            );
+            assert_eq!(store.load()?.tasks[0].project.as_deref(), Some("Bookfun"));
+        }
         Ok(())
     }
 

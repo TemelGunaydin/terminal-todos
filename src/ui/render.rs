@@ -1,5 +1,8 @@
 use super::{App, Filter, Focus, InputKind, Mode};
-use crate::model::{age, safe};
+use crate::{
+    model::{age, safe},
+    project,
+};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -61,6 +64,21 @@ impl Theme {
     }
 }
 
+fn project_badge(name: &str, theme: Theme, color: bool) -> Span<'static> {
+    let (r, g, b) = project::rgb(name);
+    Span::styled(
+        format!(" {} ", safe(name)),
+        Style::default()
+            .fg(if color {
+                Color::Rgb(r, g, b)
+            } else {
+                Color::Reset
+            })
+            .bg(if color { theme.selected } else { Color::Reset })
+            .bold(),
+    )
+}
+
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let theme = Theme::new(app.color);
     let area = frame.area();
@@ -92,7 +110,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     ])
     .margin(1)
     .areas(area);
-    header_view(frame, header, theme);
+    header_view(frame, app, header, theme);
     metrics_view(frame, app, metrics, theme);
     filters_view(frame, app, filters, theme);
     let [tasks, details] = if area.width >= 100 {
@@ -108,7 +126,18 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     modal_view(frame, app, area, theme);
 }
 
-fn header_view(frame: &mut Frame, area: Rect, theme: Theme) {
+fn header_view(frame: &mut Frame, app: &App, area: Rect, theme: Theme) {
+    let subtitle = if let Some(project) = &app.project {
+        Line::from(vec![
+            Span::styled(" Project ", Style::default().fg(theme.muted)),
+            project_badge(project, theme, app.color),
+        ])
+    } else {
+        Line::styled(
+            " Your tasks. Nothing left behind.",
+            Style::default().fg(theme.muted),
+        )
+    };
     let [brand, mode] =
         Layout::horizontal([Constraint::Min(30), Constraint::Length(18)]).areas(area);
     frame.render_widget(
@@ -117,10 +146,7 @@ fn header_view(frame: &mut Frame, area: Rect, theme: Theme) {
                 Span::styled(" >_ ", Style::default().fg(theme.accent).bold()),
                 Span::styled("TERMINAL TODOS", Style::default().fg(theme.text).bold()),
             ]),
-            Line::styled(
-                " Your tasks. Nothing left behind.",
-                Style::default().fg(theme.muted),
-            ),
+            subtitle,
         ]),
         brand,
     );
@@ -215,6 +241,21 @@ fn tasks_view(frame: &mut Frame, app: &mut App, area: Rect, theme: Theme) {
             } else {
                 theme.text
             };
+            let mut metadata = vec![Span::styled(
+                format!("     #{} ", task.id),
+                Style::default().fg(theme.muted),
+            )];
+            if let Some(project) = &task.project {
+                metadata.push(project_badge(project, theme, app.color));
+            }
+            metadata.push(Span::styled(
+                format!(
+                    " · {} · {}",
+                    if task.completed { "Completed" } else { "Open" },
+                    age(task.created_at)
+                ),
+                Style::default().fg(theme.muted),
+            ));
             ListItem::new(vec![
                 Line::from(vec![
                     Span::styled(
@@ -223,15 +264,7 @@ fn tasks_view(frame: &mut Frame, app: &mut App, area: Rect, theme: Theme) {
                     ),
                     Span::styled(safe(&task.title), Style::default().fg(text).bold()),
                 ]),
-                Line::styled(
-                    format!(
-                        "     #{} · {} · {}",
-                        task.id,
-                        if task.completed { "Completed" } else { "Open" },
-                        age(task.created_at)
-                    ),
-                    Style::default().fg(theme.muted),
-                ),
+                Line::from(metadata),
             ])
         })
         .collect();
@@ -290,6 +323,13 @@ fn details_view(frame: &mut Frame, app: &mut App, area: Rect, theme: Theme) {
                     })
                     .bold(),
             ),
+            Line::from(""),
+            Line::styled("PROJECT", Style::default().fg(theme.muted)),
+            if let Some(project) = &task.project {
+                Line::from(project_badge(project, theme, app.color))
+            } else {
+                Line::styled("Unassigned", Style::default().fg(theme.muted))
+            },
             Line::from(""),
             Line::styled("TASK ID", Style::default().fg(theme.muted)),
             Line::from(format!("#{} · IDs never change", task.id)),
@@ -378,6 +418,20 @@ fn modal_view(frame: &mut Frame, app: &App, area: Rect, theme: Theme) {
                 Paragraph::new(help).style(Style::default().fg(theme.muted)),
                 Rect::new(inner.x, inner.y, inner.width, 1),
             );
+            if matches!(kind, InputKind::Add) {
+                let project = if let Some(project) = &app.project {
+                    Line::from(vec![
+                        Span::styled("Project: ", Style::default().fg(theme.muted)),
+                        project_badge(project, theme, app.color),
+                    ])
+                } else {
+                    Line::styled("Project: Unassigned", Style::default().fg(theme.muted))
+                };
+                frame.render_widget(
+                    Paragraph::new(project),
+                    Rect::new(inner.x, inner.y + 1, inner.width, 1),
+                );
+            }
             let input = Rect::new(inner.x, inner.y + 2, inner.width, 1);
             let (text, cursor) = editor.view(input.width);
             frame.render_widget(
@@ -452,7 +506,7 @@ mod tests {
             db.add(&"Türkçe görev 🦀 ".repeat(30))?;
             db.add("Completed")?;
             db.set_completed(2, true)?;
-            let mut app = App::new(db, true);
+            let mut app = App::new(db, true, None);
             let mut terminal = Terminal::new(TestBackend::new(width, height))?;
             terminal.draw(|frame| draw(frame, &mut app))?;
             app.key(crossterm::event::KeyEvent::new(
@@ -469,7 +523,7 @@ mod tests {
     #[test]
     fn dashboard_uses_its_own_violet_indigo_palette() -> Result<()> {
         let mut terminal = Terminal::new(TestBackend::new(120, 32))?;
-        let mut app = App::new(Database::default(), true);
+        let mut app = App::new(Database::default(), true, None);
         terminal.draw(|frame| draw(frame, &mut app))?;
         let cells = terminal.backend().buffer().content();
         assert!(
@@ -483,9 +537,51 @@ mod tests {
     }
 
     #[test]
+    fn project_badges_are_visible_colored_and_safe_at_all_sizes() -> Result<()> {
+        let name = "Bookfun";
+        for color in [true, false] {
+            for (width, height) in [(120, 32), (80, 24), (60, 20)] {
+                let mut db = Database::default();
+                db.add_for_project("Project task", Some(name))?;
+                db.add_for_project("Long project task", Some(&"Türkçe 🦀 ".repeat(40)))?;
+                let mut app = App::new(db, color, Some(name.into()));
+                let mut terminal = Terminal::new(TestBackend::new(width, height))?;
+                terminal.draw(|frame| draw(frame, &mut app))?;
+                let cells = terminal.backend().buffer().content();
+                let text: String = cells.iter().map(|cell| cell.symbol()).collect();
+                assert!(text.contains(name));
+                if color {
+                    let (r, g, b) = project::rgb(name);
+                    assert!(cells.iter().any(|cell| cell.fg == Color::Rgb(r, g, b)));
+                } else {
+                    assert!(
+                        cells
+                            .iter()
+                            .all(|cell| cell.fg == Color::Reset && cell.bg == Color::Reset)
+                    );
+                }
+                app.key(crossterm::event::KeyEvent::new(
+                    crossterm::event::KeyCode::Char('a'),
+                    crossterm::event::KeyModifiers::NONE,
+                ));
+                terminal.draw(|frame| draw(frame, &mut app))?;
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content()
+                    .iter()
+                    .map(|cell| cell.symbol())
+                    .collect();
+                assert!(text.contains("Project:"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn dashboard_shows_brand_metrics_and_empty_state_without_color() -> Result<()> {
         let mut terminal = Terminal::new(TestBackend::new(120, 32))?;
-        let mut app = App::new(Database::default(), false);
+        let mut app = App::new(Database::default(), false, None);
         terminal.draw(|frame| draw(frame, &mut app))?;
         let buffer = terminal.backend().buffer();
         let text: String = buffer.content().iter().map(|cell| cell.symbol()).collect();

@@ -97,21 +97,30 @@ def run_suite():
         env = dict(os.environ, HOME=str(root), XDG_DATA_HOME=str(root / "data"), TERM="xterm-256color")
         env.pop("NO_COLOR", None)
         data_file = root / "data/terminal-todos/todos.json"
+        project = root / "Demo Project"
+        nested = project / "src"
+        nested.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(project)], env=env, check=True, capture_output=True)
 
         def cli(*args):
-            return subprocess.run([str(BINARY), *args], env=env, check=True, capture_output=True)
+            return subprocess.run([str(BINARY), *args], env=env, cwd=nested, check=True, capture_output=True)
 
         def tasks():
             return json.loads(data_file.read_text())["tasks"]
 
         for title in ["Plan the Rust migration", "Polish the dashboard", "Write integration tests"]:
             cli("add", title)
-        session = Session(env)
+        session = Session(env, cwd=nested)
         try:
-            session.wait(lambda text: "TERMINAL TODOS" in text and "1 / 3" in text)
+            session.wait(lambda text: "TERMINAL TODOS" in text and "1 / 3" in text and "Demo Project" in text)
             cells = [cell for row in session.screen.buffer.values() for cell in row.values()]
             assert any(cell.fg == "a78bfa" for cell in cells), "Expected the violet accent"
             assert any(cell.bg == "111020" for cell in cells), "Expected the midnight-indigo background"
+            project_hash = 2166136261
+            for byte in b"Demo Project":
+                project_hash = ((project_hash ^ byte) * 16777619) & 0xffffffff
+            palette = ["7dd3fc", "c4b5fd", "fcd34d", "fda4af", "a5b4fc", "fdba74"]
+            assert any(cell.fg == palette[project_hash % len(palette)] for cell in cells), "Expected the stable project badge color"
             assert all(cell.fg != "52dbaf" for cell in cells), "The old mint accent must not remain"
             session.keys(b"\x1b[B")
             session.wait(lambda text: "2 / 3" in text)
@@ -123,6 +132,7 @@ def run_suite():
             session.keys(b"\r")
             session.wait(lambda text: "Added #4" in text and "ADD TASK" not in text)
             assert tasks()[-1]["title"] == "Türkçe görev 🦀 q"
+            assert tasks()[-1]["project"] == "Demo Project", "Nested TUI must capture the Git root, not src"
             session.keys(b"a\r")
             session.wait(lambda text: "cannot be empty" in text and "ADD TASK" in text)
             assert len(tasks()) == 4
@@ -172,10 +182,10 @@ def run_suite():
             session.finish()
         finally:
             session.close()
-        print("PASS: CRUD, Unicode/paste, empty validation, search, delete confirmation, concurrent CLI edits, responsive layout, terminal restoration")
+        print("PASS: project capture/color, CRUD, Unicode/paste, empty validation, search, delete confirmation, concurrent CLI edits, responsive layout, terminal restoration")
 
         for key, sig, code in [(b"\x03", None, 130), (None, signal.SIGINT, 130), (None, signal.SIGTERM, 143)]:
-            session = Session(env, ["--color", "never"])
+            session = Session(env, ["--color", "never"], cwd=nested)
             try:
                 session.wait(lambda text: "TERMINAL TODOS" in text)
                 assert b"\x1b[38;2;" not in session.raw and b"\x1b[48;2;" not in session.raw
@@ -187,7 +197,7 @@ def run_suite():
         # Paging and details scrolling are exercised separately with a larger list.
         for i in range(30):
             cli("add", f"Task {i:02}")
-        session = Session(env)
+        session = Session(env, cwd=nested)
         try:
             session.wait(lambda text: "1 / 33" in text)
             session.keys(b"\x1b[F")

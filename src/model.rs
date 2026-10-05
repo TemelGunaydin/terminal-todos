@@ -5,6 +5,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+pub const DATA_VERSION: u32 = 2;
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
@@ -12,6 +14,8 @@ pub struct Task {
     pub title: String,
     pub completed: bool,
     pub created_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -25,7 +29,7 @@ pub struct Database {
 impl Default for Database {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: DATA_VERSION,
             next_id: 1,
             tasks: vec![],
         }
@@ -34,7 +38,7 @@ impl Default for Database {
 
 impl Database {
     pub fn validate(&self) -> Result<()> {
-        if self.version != 1 {
+        if !matches!(self.version, 1 | DATA_VERSION) {
             bail!(
                 "Unsupported data version {}. The file was not changed.",
                 self.version
@@ -45,6 +49,14 @@ impl Database {
             if task.id == 0 || task.id >= self.next_id || !ids.insert(task.id) {
                 bail!("Invalid or duplicate task ID. The file was not changed.");
             }
+            if let Some(project) = &task.project {
+                if self.version == 1 {
+                    bail!(
+                        "Project metadata requires data version {DATA_VERSION}. The file was not changed."
+                    );
+                }
+                valid_project(project)?;
+            }
         }
         if self.next_id == 0 {
             bail!("Invalid next task ID. The file was not changed.");
@@ -53,16 +65,23 @@ impl Database {
     }
 
     pub fn add(&mut self, title: &str) -> Result<Task> {
+        self.add_for_project(title, None)
+    }
+
+    pub fn add_for_project(&mut self, title: &str, project: Option<&str>) -> Result<Task> {
         let title = valid_title(title)?;
+        let project = project.map(valid_project).transpose()?;
         let next_id = self.next_id.checked_add(1).context("Task IDs exhausted")?;
         let task = Task {
             id: self.next_id,
             title,
             completed: false,
             created_at: now()?,
+            project,
         };
         self.tasks.push(task.clone());
         self.next_id = next_id;
+        self.version = DATA_VERSION;
         Ok(task)
     }
 
@@ -122,6 +141,15 @@ fn valid_title(title: &str) -> Result<String> {
     Ok(title.to_owned())
 }
 
+fn valid_project(project: &str) -> Result<String> {
+    if project.trim().is_empty() || project.chars().any(char::is_control) {
+        bail!(
+            "Project name cannot be empty or contain control characters. The file was not changed."
+        );
+    }
+    Ok(project.to_owned())
+}
+
 /// Untrusted task text must never emit terminal escape sequences.
 pub fn safe(text: &str) -> String {
     text.chars()
@@ -173,7 +201,38 @@ mod tests {
         db.tasks.push(db.tasks[0].clone());
         assert!(db.validate().is_err());
         db.tasks.pop();
-        db.version = 2;
+        db.version = DATA_VERSION + 1;
+        assert!(db.validate().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn old_tasks_are_unassigned_and_project_origin_survives_mutations() -> Result<()> {
+        let mut db: Database = serde_json::from_str(
+            r#"{"version":1,"next_id":2,"tasks":[{"id":1,"title":"Old task","completed":false,"created_at":123}]}"#,
+        )?;
+        db.validate()?;
+        assert_eq!(db.tasks[0].project, None);
+        let new = db.add_for_project("New task", Some("Bookfun"))?;
+        assert_eq!(db.version, DATA_VERSION);
+        assert_eq!(new.project.as_deref(), Some("Bookfun"));
+        db.update(2, "Edited elsewhere")?;
+        db.toggle(2)?;
+        assert_eq!(db.tasks[1].project, new.project);
+        assert_eq!(db.tasks[0].created_at, 123);
+        db.validate()
+    }
+
+    #[test]
+    fn invalid_project_never_creates_a_task() -> Result<()> {
+        let mut db = Database::default();
+        for project in ["", "  ", "bad\u{1b}[2J", "bad\nname"] {
+            assert!(db.add_for_project("Task", Some(project)).is_err());
+            assert!(db.tasks.is_empty());
+            assert_eq!(db.next_id, 1);
+        }
+        db.add_for_project("Task", Some("Good"))?;
+        db.tasks[0].project = Some("\u{7}".into());
         assert!(db.validate().is_err());
         Ok(())
     }
