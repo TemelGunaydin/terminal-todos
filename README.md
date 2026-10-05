@@ -6,6 +6,8 @@
 
 <p align="center">A simple, keyboard-first todo app for your terminal. Built with Rust.</p>
 
+![Terminal Todos dashboard with sample tasks](assets/dashboard.png)
+
 ## Install
 
 ```bash
