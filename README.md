@@ -6,9 +6,17 @@
 
 <p align="center">A simple, keyboard-first todo app for your terminal. Built with Rust.</p>
 
-![Terminal Todos dashboard showing colored project labels across four sample projects](assets/dashboard.png)
+## New in v1.5.0
 
-**New in v1.5.0:** press `c` to copy a note, `p` to choose another project without changing folders, or `/todo` to approve waiting for a busy Pi turn. Project labels introduced in v1.4.0 still keep your notes in context, with consistent colored badges—inside Pi or from the CLI.
+**Copy a note. Choose its project. Stay in the terminal.**
+
+- **`c` — copy the full note.** Send the selected note's text to your terminal clipboard (OSC52), not just the visible snippet.
+- **`p` — choose a project without changing folders.** Pick an existing name or enter a new one for subsequent notes. Existing notes keep their labels.
+- **`/todo` — let Pi finish first.** Approve waiting for a busy turn, then open the dashboard without automatically interrupting Pi.
+
+Project context stays visible through consistent colored badges, inside Pi and in the standalone app.
+
+![Terminal Todos v1.5.0 dashboard showing a full-note copy request, c/p shortcuts and colored project labels](assets/dashboard.png)
 
 ## Use inside Pi
 
@@ -159,6 +167,8 @@ Editing or completing a task from another project preserves its original label. 
 Press `p`, use `↑`/`↓` or `j`/`k`, then `Enter`. The list contains unique names from saved tasks, the automatically detected folder, and your current selection. **New project...** lets you enter a name that has no notes yet; no `~/Projects` scan or directory change is needed. `Esc` cancels.
 
 This changes the project for **subsequent additions in this dashboard session only**. Existing notes are never relabeled. Reopening Todo uses the working directory again; CLI additions still detect their own working directory.
+
+![The p project picker in Terminal Todos v1.5.0, with Bookfun selected and an option to enter a new project name](assets/project-picker.png)
 
 ## Data and privacy
 
