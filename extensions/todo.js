@@ -49,12 +49,32 @@ export default function (pi) {
       ctx.ui.notify("/todo requires Pi's interactive terminal mode.", "warning");
       return;
     }
-    if (busy || !ctx.isIdle() || ctx.hasPendingMessages()) {
-      ctx.ui.notify("Open Terminal Todos when Pi is idle.", "warning");
+    if (busy) {
+      ctx.ui.notify("Terminal Todos is already opening or open.", "warning");
       return;
     }
     busy = true;
     try {
+      if (ctx.hasPendingMessages()) {
+        ctx.ui.notify("Pi has queued messages. Finish them, or restore them with Alt+Up, then run /todo.", "warning");
+        return;
+      }
+      if (!ctx.isIdle()) {
+        // Only slash-command contexts can wait safely; shortcuts have no waitForIdle API.
+        if (typeof ctx.waitForIdle !== "function") {
+          ctx.ui.notify("Pi is still working. Wait for the reply, or press Esc to stop it, then run /todo.", "warning");
+          return;
+        }
+        const wait = await ctx.ui.confirm("Pi is still working",
+          "Wait for the current turn to finish, then open Terminal Todos?\nPi will not be interrupted. Queued messages will not be removed.");
+        if (!wait) return;
+        ctx.ui.notify("Waiting for Pi to finish before opening Terminal Todos...", "info");
+        await ctx.waitForIdle();
+      }
+      if (!ctx.isIdle() || ctx.hasPendingMessages()) {
+        ctx.ui.notify("Pi has more work pending. Finish or restore queued messages, then run /todo again.", "warning");
+        return;
+      }
       const spec = appSpec();
       let binary = await installedApp(spec);
       if (!binary) {
@@ -71,7 +91,7 @@ export default function (pi) {
       }
       // A different extension may have started work while the install dialog was open.
       if (!ctx.isIdle() || ctx.hasPendingMessages()) {
-        ctx.ui.notify("Terminal Todos is ready. Run /todo again when Pi is idle.", "info");
+        ctx.ui.notify("Terminal Todos is ready, but Pi has more work pending. Finish it, then run /todo again.", "info");
         return;
       }
       const result = await runDashboard(ctx, binary);

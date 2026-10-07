@@ -1,4 +1,4 @@
-use super::{Action, App, draw};
+use super::{Action, App, clipboard, draw};
 use crate::{model::safe, project, store::Store};
 use anyhow::{Context, Result, bail};
 use crossterm::{
@@ -116,6 +116,10 @@ pub fn run(store: Store, color: bool) -> Result<i32> {
             Action::Quit(code) => return Ok(code),
             Action::Reload => refresh_at = Instant::now(),
             Action::None => {}
+            Action::Copy { id, text } => match clipboard::copy(&mut io::stdout(), &text) {
+                Ok(()) => app.notify(format!("Copy sent for #{id} · terminal clipboard"), false),
+                Err(error) => app.notify(format!("Could not copy: {error}"), true),
+            },
             action => apply(action, &store, &mut app),
         }
     }

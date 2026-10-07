@@ -5,6 +5,24 @@ The package exposes only `extensions/todo.js`. It registers `/todo` and
 of the terminal for confirmation/download, then suspends its TUI while
 the native dashboard runs. Print/RPC/JSON modes and busy agents cannot launch it.
 
+## Current development version: v1.5.0 (unreleased)
+
+Published installs remain at v1.4.0. This checkout prepares v1.5.0 and must not
+reuse/replace v1.4.0 assets. Pi's first-use download from this checkout will fail
+until matching v1.5.0 assets are approved and published; fixture tests use isolated
+native builds instead. Homebrew and global Pi settings are not updated by this work.
+
+- `/todo` from a busy command context offers an approved `waitForIdle()`; it never
+  calls abort or clears queued messages. Shortcuts without that API refuse with
+  actionable guidance. A queue before opening, or work still pending after waiting
+  or installation, blocks terminal handoff. Concurrent invocations remain guarded.
+- Native `c` sends the selected note's complete UTF-8 title to OSC52 via Crossterm.
+  No external clipboard command, model call, or storage mutation is involved.
+  Terminal acceptance cannot be acknowledged, so the UI says “Copy sent”.
+- Native `p` lists saved project names plus detected/current names, with a new-name
+  input validated by the existing model rule. Selection is session-local and only
+  affects additions; existing origins and the schema remain unchanged.
+
 ## Installation contract
 
 - The extension and app share the version in `package.json` and `Cargo.toml`.
@@ -56,8 +74,11 @@ uv run --no-project --with pyte scripts/test_pi_tui.py /absolute/path/to/pi/dist
 The PTY suite uses the installed Pi itself, temporary configuration and task
 storage, a dummy model without inference, and an intercepted download transport.
 It covers both terminal modes, approval/decline, installation, CLI-shared tasks,
-project capture from Pi's nested Git working directory, original-label preservation,
-shortcut/editor-draft preservation, offline cache hits, Ctrl+C/SIGINT/SIGTERM, child
+project capture/selection from Pi's nested Git working directory, original-label
+preservation, full OSC52 note payloads, shortcut/editor-draft preservation, and
+busy-turn waiting through a held local fake SSE stream (no inference/network model).
+Pi 1.0.4 passes both fullscreen and regular modes. It also checks offline cache hits,
+Ctrl+C/SIGINT/SIGTERM, child
 failure, cancelled downloads, checksum failure and missing release assets.
 It places a trap on PATH to prove the old CLI is never invoked.
 

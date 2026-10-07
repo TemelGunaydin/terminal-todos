@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Isolated real-terminal tests: uv run --no-project --with pyte scripts/test_tui.py"""
+import base64
 import codecs
 import fcntl
 import json
@@ -126,13 +127,34 @@ def run_suite():
             session.wait(lambda text: "2 / 3" in text)
             session.keys(b"\x1b[F")
             session.wait(lambda text: "3 / 3" in text)
+            before_selection = data_file.read_bytes()
+            session.keys(b"p")
+            session.wait(lambda text: "SELECT PROJECT" in text)
+            session.keys(b"\x1b[F\r")
+            session.wait(lambda text: "NEW PROJECT" in text)
+            session.keys(b"\r")
+            session.wait(lambda text: "Project name cannot be empty" in text)
+            session.paste("Other project 🦀")
+            session.keys(b"\r")
+            session.wait(lambda text: "New tasks use project: Other project 🦀" in text)
+            assert data_file.read_bytes() == before_selection, "Project selection must not mutate saved tasks"
             session.keys(b"a")
-            session.wait(lambda text: "ADD TASK" in text)
+            session.wait(lambda text: "ADD TASK" in text and "Other project 🦀" in text)
             session.paste("Türkçe görev 🦀 q")
             session.keys(b"\r")
             session.wait(lambda text: "Added #4" in text and "ADD TASK" not in text)
             assert tasks()[-1]["title"] == "Türkçe görev 🦀 q"
-            assert tasks()[-1]["project"] == "Demo Project", "Nested TUI must capture the Git root, not src"
+            assert tasks()[0]["project"] == "Demo Project", "Initial tasks must capture the Git root, not src"
+            assert tasks()[-1]["project"] == "Other project 🦀", "New tasks must use the explicitly selected project"
+            before_copy = data_file.read_bytes()
+            session.keys(b"c")
+            session.wait(lambda text: "Copy sent for #4" in text)
+            payload = base64.b64encode("Türkçe görev 🦀 q".encode())
+            assert b"\x1b]52;c;" + payload + b"\x1b\\" in session.raw, "Copy must send the full UTF-8 note to OSC52"
+            assert data_file.read_bytes() == before_copy
+            session.keys(b"p\x1b[H\r")
+            session.wait(lambda text: "New tasks use project: Demo Project" in text)
+            assert tasks()[-1]["project"] == "Other project 🦀", "Changing active project must preserve existing origins"
             session.keys(b"a\r")
             session.wait(lambda text: "cannot be empty" in text and "ADD TASK" in text)
             assert len(tasks()) == 4
@@ -182,7 +204,7 @@ def run_suite():
             session.finish()
         finally:
             session.close()
-        print("PASS: project capture/color, CRUD, Unicode/paste, empty validation, search, delete confirmation, concurrent CLI edits, responsive layout, terminal restoration")
+        print("PASS: project capture/color/picker, OSC52 UTF-8 copy, CRUD, Unicode/paste, empty validation, search, delete confirmation, concurrent CLI edits, responsive layout, terminal restoration")
 
         for key, sig, code in [(b"\x03", None, 130), (None, signal.SIGINT, 130), (None, signal.SIGTERM, 143)]:
             session = Session(env, ["--color", "never"], cwd=nested)

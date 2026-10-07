@@ -104,7 +104,7 @@ test("streaming or queued work refuses both the command and shortcut", async (t)
     await command("", ctx);
     await shortcut(ctx);
     assert.deepEqual(ui.calls, []);
-    assert.ok(ui.notifications.every(([message]) => message.includes("idle")));
+    assert.ok(ui.notifications.every(([message]) => /still working|queued messages/.test(message)));
   }
 });
 
@@ -132,9 +132,73 @@ test("double invocation does not open competing dialogs", async (t) => {
   const first = command("", context(ui));
   await visible;
   await shortcut(context(ui));
-  assert.match(ui.notifications[0][0], /idle/);
+  assert.match(ui.notifications[0][0], /already opening/);
   decline(false);
   await first;
+});
+
+test("declining to wait never interrupts Pi or installs Todo", async (t) => {
+  const { context } = await interactiveSandbox(t);
+  mockFetch(t, () => assert.fail("declined wait must not fetch"));
+  const ui = mockUI();
+  await register().command("", { ...context(ui), isIdle: () => false,
+    waitForIdle: () => assert.fail("declined wait must not wait"),
+    abort: () => assert.fail("Todo must not abort Pi"),
+  });
+  assert.deepEqual(ui.calls, ["confirm"]);
+});
+
+test("an approved busy command waits before first-use approval and resets its busy flag", async (t) => {
+  const { context } = await interactiveSandbox(t);
+  mockFetch(t, () => assert.fail("must not fetch before install approval"));
+  const { command, shortcut } = register();
+  const ui = mockUI();
+  let confirms = 0;
+  ui.confirm = async () => { ui.calls.push("confirm"); return ++confirms === 1; };
+  let idle = false, release, waiting;
+  const reached = new Promise(resolve => { waiting = resolve; });
+  const first = command("", { ...context(ui), isIdle: () => idle,
+    waitForIdle: () => { waiting(); return new Promise(resolve => { release = resolve; }); },
+    abort: () => assert.fail("Todo must not abort Pi"),
+  });
+  await reached;
+  assert.equal(confirms, 1);
+  await shortcut(context(ui));
+  assert.ok(ui.notifications.some(([message]) => message.includes("already opening")));
+  idle = true; release(); await first;
+  assert.equal(confirms, 2, "first-use download approval only happens after idle");
+  const retry = mockUI();
+  await command("", context(retry));
+  assert.deepEqual(retry.calls, ["confirm"]);
+});
+
+test("a failed wait reports the error and permits a later invocation", async (t) => {
+  const { context } = await interactiveSandbox(t);
+  mockFetch(t, () => assert.fail("failed wait must not fetch"));
+  const { command } = register();
+  const ui = mockUI({ approve: true });
+  await command("", { ...context(ui), isIdle: () => false,
+    waitForIdle: async () => { throw new Error("fixture wait failed"); },
+  });
+  assert.ok(ui.notifications.some(([message, kind]) => kind === "error" && message.includes("fixture wait failed")));
+  const retry = mockUI();
+  await command("", context(retry));
+  assert.deepEqual(retry.calls, ["confirm"]);
+});
+
+test("queued work appearing while waiting is preserved and blocks installation", async (t) => {
+  const { context } = await interactiveSandbox(t);
+  mockFetch(t, () => assert.fail("queued work must not fetch"));
+  const ui = mockUI({ approve: true });
+  let idle = false, pending = false;
+  await register().command("", { ...context(ui), isIdle: () => idle,
+    hasPendingMessages: () => pending,
+    waitForIdle: async () => { idle = true; pending = true; },
+    abort: () => assert.fail("Todo must not abort Pi"),
+  });
+  assert.deepEqual(ui.calls, ["confirm"]);
+  assert.ok(ui.notifications.some(([message]) => message.includes("more work pending")));
+  assert.equal(pending, true);
 });
 
 test("approved install validates in an isolated HOME and cache hits do not prompt/download", async (t) => {

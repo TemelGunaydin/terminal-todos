@@ -141,7 +141,7 @@ fn valid_title(title: &str) -> Result<String> {
     Ok(title.to_owned())
 }
 
-fn valid_project(project: &str) -> Result<String> {
+pub(crate) fn valid_project(project: &str) -> Result<String> {
     if project.trim().is_empty() || project.chars().any(char::is_control) {
         bail!(
             "Project name cannot be empty or contain control characters. The file was not changed."

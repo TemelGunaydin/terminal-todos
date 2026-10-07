@@ -1,3 +1,4 @@
+mod clipboard;
 mod input;
 mod render;
 mod terminal;
@@ -7,6 +8,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use input::Editor;
 use ratatui::widgets::ListState;
 pub use render::draw;
+use std::collections::BTreeSet;
 pub use terminal::run;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,6 +36,7 @@ pub enum InputKind {
     Add,
     Edit(u64),
     Search,
+    Project,
 }
 #[derive(Clone, Debug)]
 pub enum Mode {
@@ -44,6 +47,10 @@ pub enum Mode {
         original_query: String,
     },
     ConfirmDelete(Task),
+    ProjectPicker {
+        projects: Vec<String>,
+        selected: usize,
+    },
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Action {
@@ -54,6 +61,7 @@ pub enum Action {
     Edit(u64, String),
     Toggle(u64),
     Delete(u64),
+    Copy { id: u64, text: String },
 }
 
 pub struct App {
@@ -67,6 +75,7 @@ pub struct App {
     pub error: bool,
     pub color: bool,
     pub project: Option<String>,
+    default_project: Option<String>,
     pub page_size: usize,
     pub detail_scroll: u16,
     pub detail_max: u16,
@@ -85,6 +94,7 @@ impl App {
             message: "Ready · changes save automatically".into(),
             error: false,
             color,
+            default_project: project.clone(),
             project,
             page_size: 1,
             detail_scroll: 0,
@@ -93,6 +103,23 @@ impl App {
         };
         app.select(0);
         app
+    }
+
+    fn project_names(&self) -> Vec<String> {
+        self.db
+            .tasks
+            .iter()
+            .filter_map(|task| task.project.clone())
+            .chain(self.default_project.clone())
+            .chain(self.project.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
+    fn select_project(&mut self, project: String) {
+        self.notify(format!("New tasks use project: {project}"), false);
+        self.project = Some(project);
     }
 
     pub fn visible(&self) -> Vec<&Task> {
@@ -204,6 +231,7 @@ impl App {
                     | KeyCode::Delete
             )
             && (matches!(self.mode, Mode::Normal | Mode::ConfirmDelete(_))
+                || matches!(self.mode, Mode::ProjectPicker { .. })
                 || key.code == KeyCode::Enter)
         {
             return Action::None;
@@ -230,6 +258,16 @@ impl App {
                         InputKind::Search => {
                             self.notify("Search applied · Esc clears the search".into(), false);
                             return Action::None;
+                        }
+                        InputKind::Project => {
+                            match crate::model::valid_project(editor.text.trim()) {
+                                Ok(project) => {
+                                    self.select_project(project);
+                                    return Action::None;
+                                }
+                                Err(error) => self.notify(error.to_string(), true),
+                            }
+                            Action::None
                         }
                     },
                     _ => {
@@ -262,6 +300,42 @@ impl App {
                     Action::None
                 }
             },
+            Mode::ProjectPicker {
+                projects,
+                mut selected,
+            } => {
+                match key.code {
+                    KeyCode::Esc => {
+                        self.notify("Project selection cancelled".into(), false);
+                        return Action::None;
+                    }
+                    KeyCode::Enter => {
+                        if let Some(project) = projects.get(selected) {
+                            self.select_project(project.clone());
+                        } else {
+                            self.notify(
+                                "Enter a project name · Enter selects, Esc cancels".into(),
+                                false,
+                            );
+                            self.mode = Mode::Input {
+                                kind: InputKind::Project,
+                                editor: Editor::new(String::new()),
+                                original_query: String::new(),
+                            };
+                        }
+                        return Action::None;
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => selected = selected.saturating_sub(1),
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        selected = (selected + 1).min(projects.len())
+                    }
+                    KeyCode::Home => selected = 0,
+                    KeyCode::End => selected = projects.len(),
+                    _ => {}
+                }
+                self.mode = Mode::ProjectPicker { projects, selected };
+                Action::None
+            }
             Mode::Normal => self.normal_key(key),
         }
     }
@@ -276,6 +350,27 @@ impl App {
         match key.code {
             KeyCode::Char('q') => return Action::Quit(0),
             KeyCode::Char('r') => return Action::Reload,
+            KeyCode::Char('c') => {
+                if let Some(task) = self.selected() {
+                    return Action::Copy {
+                        id: task.id,
+                        text: task.title.clone(),
+                    };
+                }
+            }
+            KeyCode::Char('p') => {
+                let projects = self.project_names();
+                let selected = self
+                    .project
+                    .as_ref()
+                    .and_then(|project| projects.iter().position(|name| name == project))
+                    .unwrap_or(0);
+                self.notify(
+                    "Select the project for new tasks · no existing tasks change".into(),
+                    false,
+                );
+                self.mode = Mode::ProjectPicker { projects, selected };
+            }
             KeyCode::Tab | KeyCode::BackTab => {
                 self.focus = if self.focus == Focus::Tasks {
                     Focus::Details
@@ -458,6 +553,100 @@ mod tests {
         assert_eq!(app.selected().unwrap().id, 2);
         assert_eq!(app.detail_scroll, 0);
         Ok(())
+    }
+
+    #[test]
+    fn copy_uses_selected_full_note_and_is_not_an_editor_shortcut() -> Result<()> {
+        let mut app = app()?;
+        app.key(key(KeyCode::Down));
+        let before = app.db.clone();
+        assert_eq!(
+            app.key(key(KeyCode::Char('c'))),
+            Action::Copy {
+                id: 2,
+                text: "Türkçe görev".into()
+            }
+        );
+        app.key(key(KeyCode::Tab));
+        assert_eq!(
+            app.key(key(KeyCode::Char('c'))),
+            Action::Copy {
+                id: 2,
+                text: "Türkçe görev".into()
+            }
+        );
+        app.key(key(KeyCode::Char('a')));
+        assert_eq!(app.key(key(KeyCode::Char('c'))), Action::None);
+        assert_eq!(app.key(key(KeyCode::Enter)), Action::Add("c".into()));
+        for shortcut in ['e', '/'] {
+            app.key(key(KeyCode::Char(shortcut)));
+            assert_eq!(app.key(key(KeyCode::Char('c'))), Action::None);
+            assert_eq!(app.key(key(KeyCode::Char('p'))), Action::None);
+            let Mode::Input { editor, .. } = &app.mode else {
+                panic!("Expected text input")
+            };
+            assert!(editor.text.ends_with("cp"));
+            app.key(key(KeyCode::Enter));
+        }
+        assert_eq!(app.db, before);
+        let mut empty = App::new(Database::default(), false, None);
+        assert_eq!(empty.key(key(KeyCode::Char('c'))), Action::None);
+        Ok(())
+    }
+
+    #[test]
+    fn project_picker_is_unique_session_only_and_preserves_existing_origins() -> Result<()> {
+        let mut db = Database::default();
+        db.add_for_project("One", Some("Alpha"))?;
+        db.add_for_project("Two", Some("Alpha"))?;
+        db.add_for_project("Three", Some("Beta"))?;
+        let before = db.clone();
+        let mut app = App::new(db, true, Some("Current".into()));
+        app.key(key(KeyCode::Char('p')));
+        let Mode::ProjectPicker { projects, selected } = &app.mode else {
+            panic!("Expected picker")
+        };
+        assert_eq!(projects, &["Alpha", "Beta", "Current"]);
+        assert_eq!(*selected, 2);
+        app.key(key(KeyCode::Up));
+        app.key(key(KeyCode::Enter));
+        assert_eq!(app.project.as_deref(), Some("Beta"));
+        assert_eq!(app.db, before);
+        app.key(key(KeyCode::Char('p')));
+        app.key(key(KeyCode::Home));
+        app.key(key(KeyCode::Esc));
+        assert_eq!(app.project.as_deref(), Some("Beta"));
+        app.key(key(KeyCode::Char('p')));
+        app.key(key(KeyCode::End));
+        app.key(key(KeyCode::Enter));
+        app.paste("  New project 🦀  ");
+        app.key(key(KeyCode::Enter));
+        assert_eq!(app.project.as_deref(), Some("New project 🦀"));
+        assert_eq!(app.db, before);
+        let reopened = App::new(before, true, Some("Current".into()));
+        assert_eq!(reopened.project.as_deref(), Some("Current"));
+        Ok(())
+    }
+
+    #[test]
+    fn empty_project_is_rejected_and_project_letters_are_text() {
+        let mut app = App::new(Database::default(), false, None);
+        app.key(key(KeyCode::Char('p')));
+        app.key(key(KeyCode::Enter));
+        app.key(key(KeyCode::Enter));
+        assert!(app.error);
+        assert!(matches!(
+            app.mode,
+            Mode::Input {
+                kind: InputKind::Project,
+                ..
+            }
+        ));
+        assert_eq!(app.project, None);
+        assert_eq!(app.key(key(KeyCode::Char('p'))), Action::None);
+        app.key(key(KeyCode::Char('c')));
+        app.key(key(KeyCode::Enter));
+        assert_eq!(app.project.as_deref(), Some("pc"));
     }
 
     #[test]

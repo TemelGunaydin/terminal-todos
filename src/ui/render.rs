@@ -9,8 +9,8 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Clear, List, ListItem, Padding, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, Wrap,
+        Block, BorderType, Borders, Clear, List, ListItem, ListState, Padding, Paragraph,
+        Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
     },
 };
 
@@ -340,6 +340,8 @@ fn details_view(frame: &mut Frame, app: &mut App, area: Rect, theme: Theme) {
             Line::styled("QUICK ACTIONS", Style::default().fg(theme.muted)),
             Line::from("Space  complete / reopen"),
             Line::from("e      edit task"),
+            Line::from("c      copy note to clipboard"),
+            Line::from("p      choose project for new tasks"),
             Line::from("d      delete with confirmation"),
         ]
     } else {
@@ -379,11 +381,11 @@ fn footer_view(frame: &mut Frame, app: &App, area: Rect, theme: Theme) {
                 }),
             ),
             Line::styled(
-                " ↑↓ / j k move · a add · e edit · Space complete · d delete",
+                " ↑↓ move · a add · e edit · Space done · d del · c copy",
                 Style::default().fg(theme.muted),
             ),
             Line::styled(
-                " 1/2/3 filter · / search · Tab panel · r refresh · q quit",
+                " p project · 1/2/3 · / search · Tab · r refresh · q quit",
                 Style::default().fg(theme.muted),
             ),
         ]),
@@ -396,7 +398,11 @@ fn modal_view(frame: &mut Frame, app: &App, area: Rect, theme: Theme) {
         return;
     }
     let width = area.width.saturating_sub(8).min(76);
-    let height = 9;
+    let height = if let Mode::ProjectPicker { projects, .. } = &app.mode {
+        (projects.len().saturating_add(5).min(14) as u16).min(area.height.saturating_sub(4))
+    } else {
+        9
+    };
     let modal = Rect::new(
         area.x + (area.width - width) / 2,
         area.y + (area.height - height) / 2,
@@ -410,6 +416,10 @@ fn modal_view(frame: &mut Frame, app: &App, area: Rect, theme: Theme) {
                 InputKind::Add => (" ADD TASK ", "What would you like to get done?"),
                 InputKind::Edit(_) => (" EDIT TASK ", "Update the task text."),
                 InputKind::Search => (" SEARCH ", "Filter task titles as you type."),
+                InputKind::Project => (
+                    " NEW PROJECT ",
+                    "Name the project for new tasks in this session.",
+                ),
             };
             let block = theme.block(title, true).padding(Padding::horizontal(1));
             let inner = block.inner(modal);
@@ -439,7 +449,7 @@ fn modal_view(frame: &mut Frame, app: &App, area: Rect, theme: Theme) {
                 input,
             );
             frame.set_cursor_position((input.x + cursor, input.y));
-            let hint = if matches!(kind, InputKind::Search) {
+            let hint = if matches!(kind, InputKind::Search | InputKind::Project) {
                 "Enter apply · Esc cancel · Ctrl+U clear"
             } else {
                 "Enter save · Esc cancel · Ctrl+U clear"
@@ -486,6 +496,39 @@ fn modal_view(frame: &mut Frame, app: &App, area: Rect, theme: Theme) {
                         .padding(Padding::horizontal(1)),
                 ),
                 modal,
+            );
+        }
+        Mode::ProjectPicker { projects, selected } => {
+            let block = theme
+                .block(" SELECT PROJECT ", true)
+                .padding(Padding::horizontal(1));
+            let inner = block.inner(modal);
+            frame.render_widget(block, modal);
+            frame.render_widget(
+                Paragraph::new("↑↓ choose · Enter select · Esc cancel")
+                    .style(Style::default().fg(theme.muted)),
+                Rect::new(inner.x, inner.y, inner.width, 1),
+            );
+            let items: Vec<_> = projects
+                .iter()
+                .map(|name| ListItem::new(Line::from(project_badge(name, theme, app.color))))
+                .chain(std::iter::once(ListItem::new(Line::styled(
+                    " + New project...",
+                    Style::default().fg(theme.text),
+                ))))
+                .collect();
+            let mut state = ListState::default().with_selected(Some(*selected));
+            frame.render_stateful_widget(
+                List::new(items)
+                    .highlight_style(Style::default().bg(theme.selected))
+                    .highlight_symbol("▎ "),
+                Rect::new(
+                    inner.x,
+                    inner.y + 2,
+                    inner.width,
+                    inner.height.saturating_sub(2),
+                ),
+                &mut state,
             );
         }
         Mode::Normal => {}
@@ -574,6 +617,43 @@ mod tests {
                     .collect();
                 assert!(text.contains("Project:"));
             }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn project_picker_and_name_editor_render_with_many_unicode_projects() -> Result<()> {
+        for (width, height) in [(120, 32), (80, 24), (60, 20), (1, 1)] {
+            let mut db = Database::default();
+            for i in 0..25 {
+                db.add_for_project("Task", Some(&format!("Türkçe project {i}")))?;
+            }
+            let mut app = App::new(db, true, Some("Current".into()));
+            let mut terminal = Terminal::new(TestBackend::new(width, height))?;
+            app.key(crossterm::event::KeyEvent::new(
+                crossterm::event::KeyCode::Char('p'),
+                crossterm::event::KeyModifiers::NONE,
+            ));
+            app.key(crossterm::event::KeyEvent::new(
+                crossterm::event::KeyCode::End,
+                crossterm::event::KeyModifiers::NONE,
+            ));
+            terminal.draw(|frame| draw(frame, &mut app))?;
+            if width >= 60 {
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content()
+                    .iter()
+                    .map(|cell| cell.symbol())
+                    .collect();
+                assert!(text.contains("SELECT PROJECT") && text.contains("New project..."));
+            }
+            app.key(crossterm::event::KeyEvent::new(
+                crossterm::event::KeyCode::Enter,
+                crossterm::event::KeyModifiers::NONE,
+            ));
+            terminal.draw(|frame| draw(frame, &mut app))?;
         }
         Ok(())
     }
