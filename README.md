@@ -8,9 +8,7 @@
 
 ![Terminal Todos dashboard showing colored project labels across four sample projects](assets/dashboard.png)
 
-**New in v1.4.0: keep the project with the note.** Todo automatically remembers where each task was created and displays a consistent, colored project badge. Switch projects without losing the context of your notes—inside Pi or from the CLI.
-
-**In development — v1.5.0 (not released):** `c` copies the selected note, `p` chooses the project for new notes, and `/todo` can offer to wait for a busy Pi turn. The installation commands below still point to the published v1.4.0; these additions need the next release.
+**New in v1.5.0:** press `c` to copy a note, `p` to choose another project without changing folders, or `/todo` to approve waiting for a busy Pi turn. Project labels introduced in v1.4.0 still keep your notes in context, with consistent colored badges—inside Pi or from the CLI.
 
 ## Use inside Pi
 
@@ -21,7 +19,7 @@ Open the dashboard without leaving [Pi](https://pi.dev/). Supports macOS 11+ and
 Run this in your **terminal**, not as a Pi slash command:
 
 ```bash
-pi install git:github.com/TemelGunaydin/terminal-todos@v1.4.0
+pi install git:github.com/TemelGunaydin/terminal-todos@v1.5.0
 ```
 
 This installs the extension for your user. Add `--local` to install it only for the current project; project extensions require Pi's project-trust approval.
@@ -55,7 +53,7 @@ If the managed app is missing, Pi asks **“Install Terminal Todos?”**. Approv
 | `q` / `Ctrl+C` in the dashboard | Close Todo and return to Pi |
 | `/reload` in Pi | Reload installed extensions |
 
-Your unsent Pi editor text is preserved. The dashboard only takes the terminal while Pi is **idle**; print, JSON and RPC modes cannot launch it. In the upcoming v1.5.0, `/todo` during an active turn offers to wait for it to finish. Declining does nothing; accepting does not interrupt Pi or remove queued messages. The shortcut still asks you to wait or stop Pi yourself. Queued messages must finish, or be restored with Pi's `Alt+Up`, before opening.
+Your unsent Pi editor text is preserved. The dashboard only takes the terminal while Pi is **idle**; print, JSON and RPC modes cannot launch it. In v1.5.0, `/todo` during an active turn offers to wait for it to finish. Declining does nothing; accepting does not interrupt Pi or remove queued messages. The shortcut still asks you to wait or stop Pi yourself. Queued messages must finish, or be restored with Pi's `Alt+Up`, before opening.
 
 ## Use as a standalone app
 
@@ -104,8 +102,8 @@ Changes save automatically. Use a terminal of at least **60 columns × 20 rows**
 | `Tab` / `Shift+Tab` | Switch between tasks and details |
 | `a` | Add a task |
 | `e` | Edit the selected task |
-| `c` | Copy the selected note's full text (v1.5.0, unreleased) |
-| `p` | Choose the project for new tasks in this session (v1.5.0, unreleased) |
+| `c` | Copy the selected note's full text |
+| `p` | Choose the project for new tasks in this session |
 | `Space` | Complete or reopen the selected task |
 | `d` | Delete the selected task, with confirmation |
 | `/` | Search task titles as you type |
@@ -118,7 +116,7 @@ Changes save automatically. Use a terminal of at least **60 columns × 20 rows**
 
 While adding/editing/searching, letters are text, not dashboard shortcuts. Unicode and paste are supported. Use `←` / `→`, `Home` / `End`, `Backspace` / `Delete` to edit; **Ctrl+A / Ctrl+E** move to the start / end and **Ctrl+U** clears text before the cursor.
 
-### Copy a note — upcoming v1.5.0
+### Copy a note
 
 Press `c` in the normal dashboard, with either panel focused. Only the note text is copied, not its ID or project badge. It uses the terminal clipboard protocol **OSC52**, including over SSH; your terminal must support and allow clipboard writes (for example, WezTerm). “Copy sent” means the request was written, not that the terminal acknowledged it. Terminal/multiplexer policies can block or limit clipboard requests. In text-entry modes, `c` remains a normal letter.
 
@@ -156,7 +154,7 @@ The dashboard shows colored project badges in the list and details, with the act
 
 Editing or completing a task from another project preserves its original label. Existing Rust and imported Swift tasks remain unassigned; all projects still share one task file.
 
-### Choose another project — upcoming v1.5.0
+### Choose another project
 
 Press `p`, use `↑`/`↓` or `j`/`k`, then `Enter`. The list contains unique names from saved tasks, the automatically detected folder, and your current selection. **New project...** lets you enter a name that has no notes yet; no `~/Projects` scan or directory change is needed. `Esc` cancels.
 
@@ -175,12 +173,12 @@ Your tasks stay on your device. The Pi launcher does not send task contents to t
 
 ## Manage the Pi package
 
-Check installed packages with `pi list`. The command above pins **v1.4.0**: `pi update --extensions` will not move a pinned tag to a newer release. If you installed v1.3.0 or an older tag, run the installation command above to upgrade, then `/reload` in Pi. Use the new published tag for future upgrades too.
+Check installed packages with `pi list`. The command above pins **v1.5.0**: `pi update --extensions` will not move a pinned tag to a newer release. If you installed v1.4.0 or an older tag, run the installation command above to upgrade, then `/reload` in Pi. Use the new published tag for future upgrades too.
 
 To remove the extension:
 
 ```bash
-pi remove git:github.com/TemelGunaydin/terminal-todos@v1.4.0
+pi remove git:github.com/TemelGunaydin/terminal-todos@v1.5.0
 ```
 
 Then `/reload` or restart Pi. Add `--local` if you installed it for the project. Removing the extension does not delete your tasks.
@@ -189,7 +187,7 @@ Then `/reload` or restart Pi. Add `--local` if you installed it for the project.
 
 - **`/todo` is not recognized:** check `pi list`, then `/reload` or restart Pi. For a project-local install, approve project trust.
 - **Shortcut does nothing:** use `/todo`; your terminal or another binding may intercept Ctrl+Alt+T.
-- **Pi is busy:** published v1.4.0 requires streaming and queued work to finish before opening. Upcoming v1.5.0 offers an approved wait from `/todo`; it never aborts Pi automatically. Finish queued messages, or restore them with `Alt+Up`, then retry.
+- **Pi is busy:** published v1.4.0 requires streaming and queued work to finish before opening. v1.5.0 offers an approved wait from `/todo`; it never aborts Pi automatically. Finish queued messages, or restore them with `Alt+Up`, then retry.
 - **Copy does not reach the clipboard (v1.5.0):** check that your terminal supports OSC52 and allows clipboard writes; SSH/multiplexer policies and size limits may block them.
 - **Dashboard requires an interactive terminal:** use a real terminal, or `todo list` for piped output. Resize if the dashboard asks for more space.
 - **Download fails:** check your connection and retry `/todo`. If a release asset is not yet available, wait for its publication; there is no automatic Rust/Cargo fallback.
@@ -197,4 +195,4 @@ Then `/reload` or restart Pi. Add `--local` if you installed it for the project.
 - **Old app cannot read tasks after a v1.4.0 upgrade:** use v1.4.0+ for both Pi and the standalone CLI. Do not delete the task file to make an older app work.
 - **Migration backup differs from current data:** keep the existing backup, move it aside, then retry. Neither file is overwritten while the conflict exists.
 
-[Release binaries](https://github.com/TemelGunaydin/terminal-todos/releases/tag/v1.4.0) · [Development and release notes](docs/pi.md)
+[Release binaries](https://github.com/TemelGunaydin/terminal-todos/releases/tag/v1.5.0) · [Development and release notes](docs/pi.md)

@@ -1,9 +1,9 @@
 class Todo < Formula
   desc "Keyboard-first terminal todo dashboard written in Rust"
   homepage "https://github.com/TemelGunaydin/terminal-todos"
-  url "https://github.com/TemelGunaydin/terminal-todos/releases/download/v1.4.0/terminal-todos-1.4.0.tar.gz"
-  version "1.4.0"
-  sha256 "79eee958c97d7a6a8d327d5696f3af01b67e7b966a6ee378ee63914becde3b36"
+  url "https://github.com/TemelGunaydin/terminal-todos/releases/download/v1.5.0/terminal-todos-1.5.0.tar.gz"
+  version "1.5.0"
+  sha256 "c7df7527503feba0acaa23aaead15ca87e647e4b718231111e35b38b1354eb90"
   license "MIT"
 
   depends_on "rust" => :build
@@ -18,7 +18,7 @@ class Todo < Formula
       original = "[\"Legacy task\"]\n"
       legacy.write original
 
-      assert_match "todo 1.4.0", shell_output("#{bin}/todo --version")
+      assert_match "todo 1.5.0", shell_output("#{bin}/todo --version")
       assert_match "dashboard", shell_output("#{bin}/todo --help")
       assert_match "[ ] #1 Legacy task", shell_output("#{bin}/todo list --all")
       system bin/"todo", "add", "Homebrew task"

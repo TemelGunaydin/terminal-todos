@@ -5,12 +5,14 @@ The package exposes only `extensions/todo.js`. It registers `/todo` and
 of the terminal for confirmation/download, then suspends its TUI while
 the native dashboard runs. Print/RPC/JSON modes and busy agents cannot launch it.
 
-## Current development version: v1.5.0 (unreleased)
+## Current release: v1.5.0
 
-Published installs remain at v1.4.0. This checkout prepares v1.5.0 and must not
-reuse/replace v1.4.0 assets. Pi's first-use download from this checkout will fail
-until matching v1.5.0 assets are approved and published; fixture tests use isolated
-native builds instead. Homebrew and global Pi settings are not updated by this work.
+v1.5.0 has matching native binaries/checksums for all four targets and a separate
+Homebrew source archive/formula. Its release tag points to `33feaaf`; later
+publishing documentation does not change the tag or executable sources. Use
+`git:github.com/TemelGunaydin/terminal-todos@v1.5.0` for the Pi package.
+Older v1.2.0/v1.3.0/v1.4.0 tags, assets and checksums remain immutable.
+Homebrew and Pi upgrades are separate, explicitly approved operations.
 
 - `/todo` from a busy command context offers an approved `waitForIdle()`; it never
   calls abort or clears queued messages. Shortcuts without that API refuse with
@@ -43,9 +45,10 @@ native builds instead. Homebrew and global Pi settings are not updated by this w
 ## Project attribution and data compatibility (v1.4.0)
 
 `runDashboard` already passes `ctx.cwd` as the native process's working directory.
-Rust captures the Git top-level folder name, falling back to the current folder
-when Git is unavailable or it is not a repository. Store only the name on new
-tasks, never the absolute path. Project colors are derived from that name in
+Rust defaults to the Git top-level folder name, falling back to the current folder
+when Git is unavailable or it is not a repository. The dashboard's `p` overrides
+that creation project for the current session; the CLI still detects its cwd.
+Store only the name on new tasks, never the absolute path. Project colors are derived from that name in
 Rust and shared between TUI and CLI, not saved in the database. Existing tasks
 and Swift imports remain unassigned; edits/status changes keep the saved origin.
 
@@ -78,8 +81,8 @@ project capture/selection from Pi's nested Git working directory, original-label
 preservation, full OSC52 note payloads, shortcut/editor-draft preservation, and
 busy-turn waiting through a held local fake SSE stream (no inference/network model).
 Pi 1.0.4 passes both fullscreen and regular modes. It also checks offline cache hits,
-Ctrl+C/SIGINT/SIGTERM, child
-failure, cancelled downloads, checksum failure and missing release assets.
+Ctrl+C/SIGINT/SIGTERM, child failure, cancelled downloads, checksum failure and
+missing release assets.
 It places a trap on PATH to prove the old CLI is never invoked.
 
 Try without registering a global package:

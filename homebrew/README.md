@@ -8,7 +8,7 @@ depends_on "rust" => :build
 system "cargo", "install", *std_cargo_args
 ```
 
-The Rust version is **1.4.0**, including automatic project labels and schema-2 data support. The formula retains the tap's MIT license declaration and has no Swift-only macOS restriction. Native application tests/builds pass for macOS and Linux on arm64/x64; the actual Homebrew formula install/test has been exercised locally on macOS.
+The Rust version is **1.5.0**, including full-note OSC52 clipboard requests, session-local project selection, automatic project labels and schema-2 data support. The formula retains the tap's MIT license declaration and has no Swift-only macOS restriction. Native application tests/builds pass for macOS and Linux on arm64/x64; the actual Homebrew formula install/test has been exercised locally on macOS.
 
 The formula points to an immutable GitHub release asset. Publishing a formula does not change an existing installation: users choose when to run `brew update` and `brew upgrade temelgunaydin/tap/todo`.
 
@@ -23,8 +23,8 @@ python3 scripts/package_homebrew.py
 
 Run from the repository root. This creates:
 
-- `dist/terminal-todos-1.4.0.tar.gz`
-- `dist/terminal-todos-1.4.0.tar.gz.sha256`
+- `dist/terminal-todos-1.5.0.tar.gz`
+- `dist/terminal-todos-1.5.0.tar.gz.sha256`
 - `homebrew/Formula/todo.rb`, with the SHA-256 of that exact archive.
 
 The source archive includes the lockfile, Rust sources/tests, original Swift sources for rollback, icon, real dashboard screenshot, README/developer notes, and installation/test scripts. It excludes `.git`, `.pi`, build output, and user data. Stable file order, normalized metadata, and a fixed gzip timestamp make identical inputs reproduce the same checksum.
@@ -51,12 +51,12 @@ Publishing or updating the tap is a separate, explicit approval step. After revi
 
 1. Commit the scoped Rust/branding/packaging changes, excluding unrelated `.pi` files.
 2. Verify the generated archive matches that source, and run the validation commands.
-3. After all four native targets pass CI, publish tag/release **`v1.4.0`** on `TemelGunaydin/terminal-todos`. The tag workflow publishes native binaries/checksums; upload the exact separately generated source archive and checksum. Verify the archive's Rust sources, manifest and lockfile match the released tag.
+3. After all four native targets pass CI, publish tag/release **`v1.5.0`** on `TemelGunaydin/terminal-todos`. The tag workflow publishes native binaries/checksums; upload the exact separately generated source archive and checksum. Verify the archive's Rust sources, manifest and lockfile match the released tag.
 4. Download the published asset and verify its SHA-256 against the formula.
 5. Copy `homebrew/Formula/todo.rb` into **`TemelGunaydin/homebrew-tap`**, replacing `Formula/todo.rb`; review and commit/push that tap change separately.
 6. Only then should users run `brew update` and `brew upgrade temelgunaydin/tap/todo`.
 
-A published release archive should be immutable. If its source changes after publication, create a new version rather than overwriting the asset. The previous v1.2.0/v1.3.0 tags, assets and checksums remain unchanged.
+A published release archive should be immutable. If its source changes after publication, create a new version rather than overwriting the asset. The previous v1.2.0/v1.3.0/v1.4.0 tags, assets and checksums remain unchanged.
 
 ## Rollback
 
