@@ -46,6 +46,8 @@ test("four platform/CPU targets are pinned, unsupported platforms fail before I/
   ]) {
     const spec = appSpec({ platform, arch, agentDir: "/tmp/pi space" });
     assert.equal(spec.target, target);
+    assert.equal(spec.directory, join("/tmp/pi space", "cache", "terminal-todos", APP_VERSION, target));
+    assert.equal(spec.binary, join(spec.directory, "todo"));
     assert.equal(spec.asset, `terminal-todos-${APP_VERSION}-${target}`);
     assert.equal(spec.baseUrl, `https://github.com/TemelGunaydin/terminal-todos/releases/download/v${APP_VERSION}`);
   }
@@ -56,7 +58,7 @@ test("four platform/CPU targets are pinned, unsupported platforms fail before I/
 test("missing app detection neither creates files nor runs a PATH executable", async (t) => {
   const spec = await sandbox(t);
   assert.equal(await installedApp(spec), undefined);
-  assert.deepEqual(await readdir(spec.directory.split("/tools/")[0]), []);
+  assert.deepEqual(await readdir(spec.directory.split("/cache/")[0]), []);
 });
 
 test("verified download is committed with a receipt; later calls are offline and idempotent", async (t) => {

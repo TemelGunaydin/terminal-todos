@@ -6,7 +6,15 @@
 
 <p align="center">A simple, keyboard-first todo app for your terminal. Built with Rust.</p>
 
-## New in v1.5.0
+## New in v1.5.1
+
+Pi's executable cache now lives under `~/.pi/agent/cache/terminal-todos/`, avoiding
+Pi's deprecated `tools/` startup warning. Task data and native dashboard behavior
+are unchanged from v1.5.0. Existing Pi installations should move their old
+`~/.pi/agent/tools/terminal-todos/` directory into `~/.pi/agent/cache/` once, without
+overwriting an existing destination. Do not move or delete the task-data directory.
+
+## Features from v1.5.0
 
 **Copy a note. Choose its project. Stay in the terminal.**
 
@@ -27,7 +35,7 @@ Open the dashboard without leaving [Pi](https://pi.dev/). Supports macOS 11+ and
 Run this in your **terminal**, not as a Pi slash command:
 
 ```bash
-pi install git:github.com/TemelGunaydin/terminal-todos@v1.5.0
+pi install git:github.com/TemelGunaydin/terminal-todos@v1.5.1
 ```
 
 This installs the extension for your user. Add `--local` to install it only for the current project; project extensions require Pi's project-trust approval.
@@ -177,18 +185,18 @@ Your tasks stay on your device. The Pi launcher does not send task contents to t
 - Default task file: `~/.local/share/terminal-todos/todos.json`.
 - With an **absolute** `XDG_DATA_HOME`: `$XDG_DATA_HOME/terminal-todos/todos.json`.
 - Existing `~/.swift_todos.json` tasks are imported once when Rust data does not exist. The original Swift file is left unchanged; the old Swift app is **not** live-synchronized with Rust.
-- Pi's executable cache is separate: `~/.pi/agent/tools/terminal-todos/<version>/<target>/`. A custom `PI_CODING_AGENT_DIR` moves that cache, not the task file.
+- Pi's executable cache is separate: `~/.pi/agent/cache/terminal-todos/<version>/<target>/`. A custom `PI_CODING_AGENT_DIR` moves that cache, not the task file.
 
 **v1.4.0 compatibility:** existing version-1 Rust files can be read without changing them. The first successful mutation upgrades to version 2 and saves an exact `todos.v1.backup.json` beside `todos.json`. Old tasks keep their IDs, titles, status, and timestamps. Todo v1.3.0 and older reject version-2 data rather than overwrite it: use v1.4.0+ for every Pi/CLI instance sharing that file. If rolling back, keep both the current file and backup; the backup is a pre-upgrade snapshot and does not include later changes.
 
 ## Manage the Pi package
 
-Check installed packages with `pi list`. The command above pins **v1.5.0**: `pi update --extensions` will not move a pinned tag to a newer release. If you installed v1.4.0 or an older tag, run the installation command above to upgrade, then `/reload` in Pi. Use the new published tag for future upgrades too.
+Check installed packages with `pi list`. The command above pins **v1.5.1**: `pi update --extensions` will not move a pinned tag to a newer release. If you installed v1.5.0 or an older tag, run the installation command above to upgrade, then `/reload` in Pi. Use the new published tag for future upgrades too.
 
 To remove the extension:
 
 ```bash
-pi remove git:github.com/TemelGunaydin/terminal-todos@v1.5.0
+pi remove git:github.com/TemelGunaydin/terminal-todos@v1.5.1
 ```
 
 Then `/reload` or restart Pi. Add `--local` if you installed it for the project. Removing the extension does not delete your tasks.
@@ -205,4 +213,4 @@ Then `/reload` or restart Pi. Add `--local` if you installed it for the project.
 - **Old app cannot read tasks after a v1.4.0 upgrade:** use v1.4.0+ for both Pi and the standalone CLI. Do not delete the task file to make an older app work.
 - **Migration backup differs from current data:** keep the existing backup, move it aside, then retry. Neither file is overwritten while the conflict exists.
 
-[Release binaries](https://github.com/TemelGunaydin/terminal-todos/releases/tag/v1.5.0) · [Development and release notes](docs/pi.md)
+[Release binaries](https://github.com/TemelGunaydin/terminal-todos/releases/tag/v1.5.1) · [Development and release notes](docs/pi.md)

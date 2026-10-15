@@ -5,14 +5,19 @@ The package exposes only `extensions/todo.js`. It registers `/todo` and
 of the terminal for confirmation/download, then suspends its TUI while
 the native dashboard runs. Print/RPC/JSON modes and busy agents cannot launch it.
 
-## Current release: v1.5.0
+## Current Pi release: v1.5.1
 
-v1.5.0 has matching native binaries/checksums for all four targets and a separate
-Homebrew source archive/formula. Its release tag points to `33feaaf`; later
-publishing documentation does not change the tag or executable sources. Use
-`git:github.com/TemelGunaydin/terminal-todos@v1.5.0` for the Pi package.
-Older v1.2.0/v1.3.0/v1.4.0 tags, assets and checksums remain immutable.
-Homebrew and Pi upgrades are separate, explicitly approved operations.
+v1.5.1 moves Pi's executable cache out of the deprecated `tools/` directory and
+into `cache/terminal-todos/`, without changing task data or dashboard behavior.
+Use `git:github.com/TemelGunaydin/terminal-todos@v1.5.1` for the Pi package.
+The matching native binaries/checksums are built for all four targets by the tag
+workflow. Existing installations should move `tools/terminal-todos/` into `cache/`
+once, only when the destination does not already exist; never move task data.
+
+Homebrew remains at v1.5.0, which has its own source archive/formula. Its release
+tag points to `33feaaf`; later publishing documentation does not change it.
+Older tags, assets and checksums remain immutable. Homebrew and Pi upgrades are
+separate, explicitly approved operations.
 
 - `/todo` from a busy command context offers an approved `waitForIdle()`; it never
   calls abort or clears queued messages. Shortcuts without that API refuse with
@@ -34,7 +39,8 @@ Homebrew and Pi upgrades are separate, explicitly approved operations.
   probe uses a temporary HOME/data directory; incompatible binaries are rejected.
 - The complete binary/receipt directory is committed by rename. Later launches
   verify its SHA-256 and executable permission, without network access.
-- Cache: `<PI_CODING_AGENT_DIR or ~/.pi/agent>/tools/terminal-todos/<version>/<target>`.
+- Cache: `<PI_CODING_AGENT_DIR or ~/.pi/agent>/cache/terminal-todos/<version>/<target>`.
+  Keep executable caches outside Pi's deprecated `tools/` directory to avoid startup warnings.
   Corrupt caches fail closed; the error identifies only the cache to remove.
 - Arbitrary PATH `todo` executables are never probed or used: the old Swift CLI
   can interpret flags as new tasks. Homebrew, PATH and real tasks are not changed

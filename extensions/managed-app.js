@@ -22,7 +22,8 @@ export function appSpec({ platform = process.platform, arch = process.arch, agen
   if (!target) throw new Error(`Terminal Todos supports macOS/Linux on arm64 and x64, not ${platform}/${arch}.`);
   agentDir ??= process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
   if (agentDir === "~" || agentDir.startsWith("~/")) agentDir = join(homedir(), agentDir.slice(2));
-  const directory = join(resolve(agentDir), "tools", "terminal-todos", APP_VERSION, target);
+  // Pi treats non-hidden entries in tools/ as deprecated custom tools.
+  const directory = join(resolve(agentDir), "cache", "terminal-todos", APP_VERSION, target);
   const asset = `terminal-todos-${APP_VERSION}-${target}`;
   return {
     version: APP_VERSION,
